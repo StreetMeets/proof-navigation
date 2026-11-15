@@ -267,12 +267,13 @@ function czRank(place,q){
  if(String(place.countryCode).toUpperCase()==="CZ")score+=40;
  if(place.street)score+=5;
  if(place.house)score+=5;
+ if(/[0-9]/.test(q)&&place.house&&czNormalize(q).includes(czNormalize(place.house)))score+=25;
  return score;
 }
 async function searchProviders(q,signal){
  const query=q.trim().replace(/\s+/g," ");
  // Bounding box spans the entire Czech Republic, not just Prague.
- const url="https://photon.komoot.io/api/?limit=15&bbox=12.09,48.55,18.87,51.06&q="+encodeURIComponent(query);
+ const url="https://photon.komoot.io/api/?limit=30&bbox=12.09,48.55,18.87,51.06&q="+encodeURIComponent(query);
  const r=await fetch(url,{signal,headers:{"Accept":"application/json"}});
  if(!r.ok)throw Error("Vyhledávací služba HTTP "+r.status+" (Photon)");
  const data=await r.json(),unique=new Set();
@@ -282,7 +283,7 @@ async function searchProviders(q,signal){
   const title=p.name||street||city||"Neznámé místo";
   const detail=[street&&p.name!==street?street:null,city,p.state,p.country].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(", ");
   return {title,detail,display_name:[title,detail].filter(Boolean).join(", "),lat:f.geometry.coordinates[1],lon:f.geometry.coordinates[0],countryCode:p.countrycode||"",street:p.street||"",house:p.housenumber||""};
- }).filter(p=>{const key=[p.lat.toFixed(5),p.lon.toFixed(5),czNormalize(p.title)].join(":");if(unique.has(key))return false;unique.add(key);return true}).sort((x,y)=>czRank(y,query)-czRank(x,query)).slice(0,9);
+ }).filter(p=>String(p.countryCode).toUpperCase()==="CZ"||(!p.countryCode&&p.lat>=48.55&&p.lat<=51.06&&p.lon>=12.09&&p.lon<=18.87)).filter(p=>{const key=[p.lat.toFixed(5),p.lon.toFixed(5),czNormalize(p.title)].join(":");if(unique.has(key))return false;unique.add(key);return true}).sort((x,y)=>czRank(y,query)-czRank(x,query)).slice(0,9);
 }
 searchInput.addEventListener("input",()=>{
  resetSelected();clearTimeout(lookupTimer);if(lookupController)lookupController.abort();
