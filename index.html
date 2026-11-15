@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101114"><meta name="proof-build" content="cinema-dragon-intro-2026-11-16"><meta name="description" content="Proof – automobilová navigace"><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon.svg?v=dragon" type="image/svg+xml"><link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png?v=dragon"><title>Proof Navigation</title><link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"><style>
+<html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101114"><meta name="proof-build" content="address-company-search-2026-11-16"><meta name="description" content="Proof – automobilová navigace"><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon.svg?v=dragon" type="image/svg+xml"><link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png?v=dragon"><title>Proof Navigation</title><link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"><style>
 :root{--bg:#0d0e11;--panel:#17191e;--muted:#9ba1ad;--accent:#e53935;--line:#30343d}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}header{height:58px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;background:#111318;border-bottom:1px solid var(--line)}.logo{font-size:24px;font-weight:950;letter-spacing:2px}.logo span{color:var(--accent)}.tag{font-size:10px;color:var(--muted);letter-spacing:1.5px}main{display:grid;grid-template-columns:350px 1fr;height:calc(100dvh - 58px)}aside{padding:15px;background:var(--panel);overflow:auto;border-right:1px solid var(--line)}h1{font-size:20px;margin:3px 0 6px}.muted{font-size:12px;color:var(--muted);line-height:1.45;margin:0 0 13px}label{display:block;font-size:10px;color:var(--muted);font-weight:800;letter-spacing:1px;margin:12px 0 6px}input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#101217;color:white;font-size:14px}.themes{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.theme{background:#101217;border:1px solid var(--line);color:#bbb;border-radius:8px;padding:8px 3px;font-size:10px;font-weight:800}.theme:before{content:"";display:block;height:4px;border-radius:4px;background:var(--sw);margin-bottom:6px}.theme.active{border-color:var(--accent);color:white}.actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}button{cursor:pointer;border:0;border-radius:9px;padding:12px 8px;background:var(--accent);color:white;font-weight:850;font-size:11px}button.secondary{background:#242830;border:1px solid var(--line)}button:disabled{opacity:.45}.status,.nav{background:#101217;border:1px solid var(--line);border-radius:9px;padding:11px;margin-top:10px;font-size:12px;color:var(--muted);line-height:1.5}.nav{display:none;background:#291719;border-color:#633033;color:#fff}.stats{display:none;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}.stat{padding:10px;background:#242830;border-radius:9px}.stat b{display:block;font-size:18px}.stat small{color:var(--muted)}#map{height:100%;width:100%;background:#222}.mapwrap{position:relative}.mapbadge{position:absolute;z-index:500;top:12px;right:12px;background:#111d;padding:9px;border:1px solid var(--line);border-radius:8px;font-size:10px;letter-spacing:1px}footer{font-size:10px;color:var(--muted);line-height:1.5;margin-top:12px}@media(max-width:760px){main{display:flex;flex-direction:column;height:calc(100dvh - 58px)}.mapwrap{height:48%;min-height:210px;order:1}aside{height:52%;order:2;border:0;border-top:1px solid var(--line);padding:10px 12px}h1{font-size:18px}.muted{margin-bottom:6px}label{margin-top:8px}footer{margin-top:8px}}
 
 /* PROOF NEXT – full-screen Waze-inspired driving mode */
@@ -323,7 +323,7 @@ $("psBack").onclick=closeSearch;
 $("psClear").onclick=()=>{psInput.value="";searchInput.value="";resetSelected();searchInput.dispatchEvent(new Event("input"));psInput.focus()};
 searchInput.addEventListener("focus",openSearch);
 psInput.addEventListener("input",()=>{searchInput.value=psInput.value;searchInput.dispatchEvent(new Event("input"))});
-psInput.addEventListener("keydown",e=>{if(e.key==="Escape")closeSearch();if(e.key==="Enter"){e.preventDefault();const first=psResults.querySelector(".ps-item");if(first)first.click();else{searchInput.value=psInput.value;closeSearch();leaveHome();$("nextFind").click()}}});
+psInput.addEventListener("keydown",async e=>{if(e.key==="Escape")closeSearch();if(e.key==="Enter"){e.preventDefault();const query=psInput.value.trim();if(!query)return;clearTimeout(lookupTimer);if(lookupController)lookupController.abort();lookupSerial++;renderPlaces([],"Ověřuji přesnou adresu nebo firmu…");try{const matches=await searchExactAddress(query);if(!document.body.classList.contains("search-open")||psInput.value.trim()!==query)return;if(matches.length)renderPlaces(matches,"");else renderPlaces([],"Adresa ani firma nebyla nalezena. Zkus doplnit obec nebo PSČ.")}catch(err){if(document.body.classList.contains("search-open"))renderPlaces([],"Přesné vyhledávání je dočasně nedostupné. Zkus později.");console.warn("Proof exact lookup",err)}}});
 function placeDistance(p){if(!lastGpsPoint||!lastGpsPoint.p)return "";const d=haversine(lastGpsPoint.p,[Number(p.lat),Number(p.lon)]);return d>=1000?(d/1000).toFixed(1)+" km":Math.round(d)+" m"}
 
 function renderPlaces(places,emptyMessage){
@@ -355,25 +355,51 @@ function czRank(place,q){
  if(/[0-9]/.test(q)&&place.house&&czNormalize(q).includes(czNormalize(place.house)))score+=25;
  return score;
 }
+function proofAddressQueries(q){
+ const clean=q.trim().replace(/\s+/g," "),noZip=clean.replace(/\b\d{3}\s?\d{2}\b/g,"").replace(/\s*,\s*,/g,",").replace(/,\s*$/,"").trim();
+ const chunks=noZip.split(",").map(x=>x.trim()).filter(Boolean),list=[clean,noZip];
+ if(chunks.length>1)list.push(chunks.slice(0,2).join(" "));
+ const match=noZip.match(/^(.+?)\s+(\d+[a-zA-Z]?)\s*,\s*(.+)$/);
+ if(match)list.push(match[3]+" "+match[1]+" "+match[2]);
+ return [...new Set(list.filter(x=>x.length>=3))].slice(0,3);
+}
+function proofPhotonPlace(f){
+ const p=f.properties||{},city=p.city||p.town||p.village||p.county||"",street=[p.street,p.housenumber].filter(Boolean).join(" ");
+ const title=p.name||street||city||"Neznámé místo";
+ const detail=[street&&p.name!==street?street:null,city,p.postcode,p.state,p.country].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(", ");
+ return {title,detail,display_name:[title,detail].filter(Boolean).join(", "),lat:f.geometry.coordinates[1],lon:f.geometry.coordinates[0],countryCode:p.countrycode||"",street:p.street||"",house:p.housenumber||""};
+}
+function proofDedupePlaces(places,q){
+ const seen=new Set();
+ return places.filter(p=>Number.isFinite(+p.lat)&&Number.isFinite(+p.lon)).filter(p=>String(p.countryCode).toUpperCase()==="CZ"||(!p.countryCode&&p.lat>=48.55&&p.lat<=51.06&&p.lon>=12.09&&p.lon<=18.87)).filter(p=>{const key=[Number(p.lat).toFixed(5),Number(p.lon).toFixed(5),czNormalize(p.title)].join(":");if(seen.has(key))return false;seen.add(key);return true}).sort((a,b)=>czRank(b,q)-czRank(a,q)).slice(0,12);
+}
 async function searchProviders(q,signal){
- const query=q.trim().replace(/\s+/g," ");
- // Bounding box spans the entire Czech Republic, not just Prague.
- const url="https://photon.komoot.io/api/?limit=30&bbox=12.09,48.55,18.87,51.06&q="+encodeURIComponent(query);
- const r=await fetch(url,{signal,headers:{"Accept":"application/json"}});
- if(!r.ok)throw Error("Vyhledávací služba HTTP "+r.status+" (Photon)");
- const data=await r.json(),unique=new Set();
- return (data.features||[]).filter(f=>Array.isArray(f.geometry?.coordinates)).map(f=>{
-  const p=f.properties||{},city=p.city||p.town||p.village||p.county||"";
-  const street=[p.street,p.housenumber].filter(Boolean).join(" ");
-  const title=p.name||street||city||"Neznámé místo";
-  const detail=[street&&p.name!==street?street:null,city,p.state,p.country].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(", ");
-  return {title,detail,display_name:[title,detail].filter(Boolean).join(", "),lat:f.geometry.coordinates[1],lon:f.geometry.coordinates[0],countryCode:p.countrycode||"",street:p.street||"",house:p.housenumber||""};
- }).filter(p=>String(p.countryCode).toUpperCase()==="CZ"||(!p.countryCode&&p.lat>=48.55&&p.lat<=51.06&&p.lon>=12.09&&p.lon<=18.87)).filter(p=>{const key=[p.lat.toFixed(5),p.lon.toFixed(5),czNormalize(p.title)].join(":");if(unique.has(key))return false;unique.add(key);return true}).sort((x,y)=>czRank(y,query)-czRank(x,query)).slice(0,9);
+ const queries=proofAddressQueries(q),results=[];
+ // Photon is used for suggestions. Exact lookup is only on Enter (not every keystroke).
+ for(const query of queries.slice(0,2)){
+  if(signal?.aborted)throw new DOMException("Aborted","AbortError");
+  try{
+   const url="https://photon.komoot.io/api/?limit=30&bbox=12.09,48.55,18.87,51.06&q="+encodeURIComponent(query);
+   const r=await fetch(url,{signal,headers:{"Accept":"application/json"}});
+   if(!r.ok)throw Error("Photon HTTP "+r.status);
+   const data=await r.json();results.push(...(data.features||[]).filter(f=>Array.isArray(f.geometry?.coordinates)).map(proofPhotonPlace));
+   if(results.length>=8)break;
+  }catch(err){if(err.name==="AbortError")throw err;console.warn("Photon variant failed",err)}
+ }
+ return proofDedupePlaces(results,q);
+}
+async function searchExactAddress(q){
+ // Nominatim public endpoint: one explicit user-triggered request, never autocomplete.
+ const url="https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&countrycodes=cz&limit=8&q="+encodeURIComponent(q);
+ const r=await fetch(url,{headers:{"Accept":"application/json","Accept-Language":"cs"}});
+ if(!r.ok)throw Error("Nominatim HTTP "+r.status);
+ const rows=await r.json();
+ return proofDedupePlaces(rows.map(x=>({title:x.name||x.display_name.split(",")[0],detail:x.display_name,display_name:x.display_name,lat:+x.lat,lon:+x.lon,countryCode:"CZ",street:x.address?.road||"",house:x.address?.house_number||""})),q);
 }
 searchInput.addEventListener("input",()=>{
  resetSelected();clearTimeout(lookupTimer);if(lookupController)lookupController.abort();
  const q=searchInput.value.trim(),seq=++lookupSerial;
- if(q.length<3){renderPlaces(recentPlaces(),"Začni psát adresu, město nebo místo.");return}
+ if(q.length<3){renderPlaces(recentPlaces(),"Zadej ulici, číslo domu, PSČ nebo název firmy. Pro přesné hledání stiskni Enter.");return}
  renderPlaces([],"Hledám místa…");
  lookupTimer=setTimeout(async()=>{
   lookupController=new AbortController();
