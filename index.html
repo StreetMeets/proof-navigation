@@ -236,7 +236,7 @@ function czRank(place,q){
  const hay=czNormalize([place.title,place.detail].join(" ")),words=czNormalize(q).split(/\s+/).filter(Boolean);
  let score=words.reduce((sum,w)=>sum+(hay.includes(w)?12:0),0);
  if(hay.startsWith(czNormalize(q)))score+=20;
- if(place.countryCode==="CZ")score+=40;
+ if(String(place.countryCode).toUpperCase()==="CZ")score+=40;
  if(place.street)score+=5;
  if(place.house)score+=5;
  return score;
