@@ -129,10 +129,10 @@ $("nextDest").addEventListener("input",()=>{
  lookupTimer=setTimeout(async()=>{
   lookupController=new AbortController();
   try{
-   const url="https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&limit=5&q="+encodeURIComponent(q);
+   const url="https://photon.komoot.io/api/?limit=5&lang=cs&q="+encodeURIComponent(q);
    const response=await fetch(url,{signal:lookupController.signal,headers:{"Accept-Language":"cs"}});
    if(!response.ok)throw Error("Vyhledávání není dostupné");
-   const places=await response.json();if(seq!==lookupSerial)return;
+   const data=await response.json(),places=(data.features||[]).map(f=>{const p=f.properties||{};return {display_name:[p.name,p.street,p.housenumber,p.city||p.town||p.village,p.state,p.country].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(", "),lat:f.geometry.coordinates[1],lon:f.geometry.coordinates[0]}});if(seq!==lookupSerial)return;
    suggestBox.replaceChildren();
    if(!places.length){const empty=document.createElement("div");empty.className="suggest-empty";empty.textContent="Žádné výsledky. Zkus upřesnit adresu.";suggestBox.append(empty)}
    for(const p of places){
