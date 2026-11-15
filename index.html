@@ -265,9 +265,9 @@ function czRank(place,q){
 async function searchProviders(q,signal){
  const query=q.trim().replace(/\s+/g," ");
  // Bounding box spans the entire Czech Republic, not just Prague.
- const url="https://photon.komoot.io/api/?limit=15&lang=cs&bbox=12.09,48.55,18.87,51.06&q="+encodeURIComponent(query);
+ const url="https://photon.komoot.io/api/?limit=15&bbox=12.09,48.55,18.87,51.06&q="+encodeURIComponent(query);
  const r=await fetch(url,{signal,headers:{"Accept":"application/json"}});
- if(!r.ok)throw Error("Vyhledávací služba HTTP "+r.status);
+ if(!r.ok)throw Error("Vyhledávací služba HTTP "+r.status+" (Photon)");
  const data=await r.json(),unique=new Set();
  return (data.features||[]).filter(f=>Array.isArray(f.geometry?.coordinates)).map(f=>{
   const p=f.properties||{},city=p.city||p.town||p.village||p.county||"";
@@ -285,7 +285,7 @@ searchInput.addEventListener("input",()=>{
  lookupTimer=setTimeout(async()=>{
   lookupController=new AbortController();
   try{const places=await searchProviders(q,lookupController.signal);if(seq===lookupSerial)renderPlaces(places,"Žádné výsledky. Zkus upřesnit adresu.")}
-  catch(e){if(e.name!=="AbortError"&&seq===lookupSerial){renderPlaces(recentPlaces().filter(p=>p.display_name.toLocaleLowerCase("cs").includes(q.toLocaleLowerCase("cs"))),"Online vyhledávání je nedostupné. Zkus zadat celou adresu a potvrdit Enter.");console.warn("Proof search:",e)}}
+  catch(e){if(e.name!=="AbortError"&&seq===lookupSerial){renderPlaces(recentPlaces().filter(p=>p.display_name.toLocaleLowerCase("cs").includes(q.toLocaleLowerCase("cs"))),"Nepodařilo se načíst návrhy adres. Zkus znovu za chvíli nebo zadej město a celou adresu.");console.warn("Proof search:",e)}}
  },650);
 });
 
