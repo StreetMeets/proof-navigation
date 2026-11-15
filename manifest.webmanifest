@@ -1,18 +1,30 @@
 {
-  "name": "Proof Navigation",
-  "short_name": "Proof",
+  "name": "PROOF NEXT Navigation",
+  "short_name": "PROOF",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#0d0e11",
+  "background_color": "#08090d",
   "theme_color": "#101114",
-  "description": "Automobilová navigace Proof",
+  "description": "PROOF NEXT – navigace s Racing Dragon",
   "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
     {
       "src": "icon.svg",
       "sizes": "any",
       "type": "image/svg+xml",
-      "purpose": "any maskable"
+      "purpose": "any"
     }
   ]
 }
