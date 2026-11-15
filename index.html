@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101114"><meta name="proof-build" content="underground-racing-map-2026-11-16"><meta name="description" content="Proof – automobilová navigace"><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon.svg?v=dragon" type="image/svg+xml"><link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png?v=dragon"><title>Proof Navigation</title><link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"><style>
+<html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101114"><meta name="proof-build" content="hybrid-satellite-eox-2016-2026-11-16"><meta name="description" content="Proof – automobilová navigace"><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon.svg?v=dragon" type="image/svg+xml"><link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png?v=dragon"><title>Proof Navigation</title><link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"><style>
 :root{--bg:#0d0e11;--panel:#17191e;--muted:#9ba1ad;--accent:#e53935;--line:#30343d}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}header{height:58px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;background:#111318;border-bottom:1px solid var(--line)}.logo{font-size:24px;font-weight:950;letter-spacing:2px}.logo span{color:var(--accent)}.tag{font-size:10px;color:var(--muted);letter-spacing:1.5px}main{display:grid;grid-template-columns:350px 1fr;height:calc(100dvh - 58px)}aside{padding:15px;background:var(--panel);overflow:auto;border-right:1px solid var(--line)}h1{font-size:20px;margin:3px 0 6px}.muted{font-size:12px;color:var(--muted);line-height:1.45;margin:0 0 13px}label{display:block;font-size:10px;color:var(--muted);font-weight:800;letter-spacing:1px;margin:12px 0 6px}input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#101217;color:white;font-size:14px}.themes{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.theme{background:#101217;border:1px solid var(--line);color:#bbb;border-radius:8px;padding:8px 3px;font-size:10px;font-weight:800}.theme:before{content:"";display:block;height:4px;border-radius:4px;background:var(--sw);margin-bottom:6px}.theme.active{border-color:var(--accent);color:white}.actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}button{cursor:pointer;border:0;border-radius:9px;padding:12px 8px;background:var(--accent);color:white;font-weight:850;font-size:11px}button.secondary{background:#242830;border:1px solid var(--line)}button:disabled{opacity:.45}.status,.nav{background:#101217;border:1px solid var(--line);border-radius:9px;padding:11px;margin-top:10px;font-size:12px;color:var(--muted);line-height:1.5}.nav{display:none;background:#291719;border-color:#633033;color:#fff}.stats{display:none;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}.stat{padding:10px;background:#242830;border-radius:9px}.stat b{display:block;font-size:18px}.stat small{color:var(--muted)}#map{height:100%;width:100%;background:#222}.mapwrap{position:relative}.mapbadge{position:absolute;z-index:500;top:12px;right:12px;background:#111d;padding:9px;border:1px solid var(--line);border-radius:8px;font-size:10px;letter-spacing:1px}footer{font-size:10px;color:var(--muted);line-height:1.5;margin-top:12px}@media(max-width:760px){main{display:flex;flex-direction:column;height:calc(100dvh - 58px)}.mapwrap{height:48%;min-height:210px;order:1}aside{height:52%;order:2;border:0;border-top:1px solid var(--line);padding:10px 12px}h1{font-size:18px}.muted{margin-bottom:6px}label{margin-top:8px}footer{margin-top:8px}}
 
 /* PROOF NEXT – full-screen Waze-inspired driving mode */
@@ -283,7 +283,35 @@ function proofRacingMapStyle(){
   }
  }
 }
-map.on("style.load",()=>{try{proofRacingMapStyle()}catch(e){console.warn("Racing map style fallback",e)}});
+/* Hybrid satellite: EOX Sentinel-2 2016 (CC BY 4.0) + OpenFreeMap street labels.
+   The imagery is 10m resolution, not building-level aerial photography. */
+function proofHybridSatellite(){
+ const layers=map.getStyle()?.layers||[];
+ if(!map.getSource("proof-satellite")){
+  map.addSource("proof-satellite",{type:"raster",tiles:["https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg"],tileSize:256,maxzoom:13,attribution:'EOxCloudless <a href="https://cloudless.eox.at" target="_blank" rel="noopener">EOX IT Services GmbH</a> · modified Copernicus Sentinel data 2016 (CC BY 4.0)'});
+ }
+ const firstNonBackground=layers.find(l=>l.type!=="background");
+ if(!map.getLayer("proof-satellite-layer"))map.addLayer({id:"proof-satellite-layer",type:"raster",source:"proof-satellite",paint:{"raster-opacity":0.94,"raster-brightness-max":0.78,"raster-saturation":-0.22,"raster-fade-duration":250}},firstNonBackground?.id);
+ for(const layer of layers){
+  if(layer.id.startsWith("proof-"))continue;
+  try{
+   if(layer.type==="fill")map.setPaintProperty(layer.id,"fill-opacity",0);
+   if(layer.type==="line"){
+    const id=layer.id.toLowerCase();
+    if(/road|transportation|motorway|trunk|primary|secondary|tertiary|street/.test(id)){
+     map.setPaintProperty(layer.id,"line-opacity",0.72);
+     map.setPaintProperty(layer.id,"line-color","#f0e4d1");
+    }else map.setPaintProperty(layer.id,"line-opacity",0.2);
+   }
+   if(layer.type==="symbol"){
+    map.setPaintProperty(layer.id,"text-color","#fffaf2");
+    map.setPaintProperty(layer.id,"text-halo-color","#0b1118");
+    map.setPaintProperty(layer.id,"text-halo-width",2);
+   }
+  }catch(e){console.debug("Hybrid styling",layer.id,e)}
+ }
+}
+map.on("style.load",()=>{try{proofHybridSatellite()}catch(e){console.warn("Satellite layer unavailable, retaining vector map",e)}});
 map.on("load",()=>{const layers=map.getStyle().layers||[];const label=layers.find(l=>l.type==="symbol"&&l.layout&&l.layout["text-field"]);const before=label?label.id:undefined;try{map.addLayer({id:"proof-3d-buildings",source:"openmaptiles","source-layer":"building",type:"fill-extrusion",minzoom:14,paint:{"fill-extrusion-color":["interpolate",["linear"],["get","render_height"],0,"#262c39",80,"#57303b"],"fill-extrusion-height":["coalesce",["get","render_height"],["get","height"],8],"fill-extrusion-base":["coalesce",["get","render_min_height"],0],"fill-extrusion-opacity":0.82}},before)}catch(e){console.warn("3D buildings unavailable",e)}map.setPitch(42)});
 
 function openHome(){document.body.classList.add("next-mode","home-mode");document.body.classList.remove("guiding");setTimeout(()=>map.resize(),100);setTimeout(()=>{$("homeSplash").classList.add("done")},5600)}
