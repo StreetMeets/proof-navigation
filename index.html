@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101114"><meta name="proof-build" content="nearby-poi-gps-2026-11-16"><meta name="description" content="Proof – automobilová navigace"><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon.svg?v=dragon" type="image/svg+xml"><link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png?v=dragon"><title>Proof Navigation</title><link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"><style>
+<html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101114"><meta name="proof-build" content="underground-racing-map-2026-11-16"><meta name="description" content="Proof – automobilová navigace"><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon.svg?v=dragon" type="image/svg+xml"><link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png?v=dragon"><title>Proof Navigation</title><link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"><style>
 :root{--bg:#0d0e11;--panel:#17191e;--muted:#9ba1ad;--accent:#e53935;--line:#30343d}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}header{height:58px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;background:#111318;border-bottom:1px solid var(--line)}.logo{font-size:24px;font-weight:950;letter-spacing:2px}.logo span{color:var(--accent)}.tag{font-size:10px;color:var(--muted);letter-spacing:1.5px}main{display:grid;grid-template-columns:350px 1fr;height:calc(100dvh - 58px)}aside{padding:15px;background:var(--panel);overflow:auto;border-right:1px solid var(--line)}h1{font-size:20px;margin:3px 0 6px}.muted{font-size:12px;color:var(--muted);line-height:1.45;margin:0 0 13px}label{display:block;font-size:10px;color:var(--muted);font-weight:800;letter-spacing:1px;margin:12px 0 6px}input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#101217;color:white;font-size:14px}.themes{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.theme{background:#101217;border:1px solid var(--line);color:#bbb;border-radius:8px;padding:8px 3px;font-size:10px;font-weight:800}.theme:before{content:"";display:block;height:4px;border-radius:4px;background:var(--sw);margin-bottom:6px}.theme.active{border-color:var(--accent);color:white}.actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}button{cursor:pointer;border:0;border-radius:9px;padding:12px 8px;background:var(--accent);color:white;font-weight:850;font-size:11px}button.secondary{background:#242830;border:1px solid var(--line)}button:disabled{opacity:.45}.status,.nav{background:#101217;border:1px solid var(--line);border-radius:9px;padding:11px;margin-top:10px;font-size:12px;color:var(--muted);line-height:1.5}.nav{display:none;background:#291719;border-color:#633033;color:#fff}.stats{display:none;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}.stat{padding:10px;background:#242830;border-radius:9px}.stat b{display:block;font-size:18px}.stat small{color:var(--muted)}#map{height:100%;width:100%;background:#222}.mapwrap{position:relative}.mapbadge{position:absolute;z-index:500;top:12px;right:12px;background:#111d;padding:9px;border:1px solid var(--line);border-radius:8px;font-size:10px;letter-spacing:1px}footer{font-size:10px;color:var(--muted);line-height:1.5;margin-top:12px}@media(max-width:760px){main{display:flex;flex-direction:column;height:calc(100dvh - 58px)}.mapwrap{height:48%;min-height:210px;order:1}aside{height:52%;order:2;border:0;border-top:1px solid var(--line);padding:10px 12px}h1{font-size:18px}.muted{margin-bottom:6px}label{margin-top:8px}footer{margin-top:8px}}
 
 /* PROOF NEXT – full-screen Waze-inspired driving mode */
@@ -252,7 +252,39 @@ const $=id=>document.getElementById(id), root=document.documentElement, colors={
 let map=new maplibregl.Map({container:"map",style:"https://tiles.openfreemap.org/styles/dark",center:[15.5,49.8],zoom:6,pitch:38,bearing:0,antialias:true}),dragonMarker=null,dest=null,coords=[],watch=null,rerouteAt=0,offCount=0,lastGpsPoint=null,lastSpeed=0,lastStreetAt=0,lastStreetPoint=null,routeSteps=[],routeCum=[],routeDistance=0,routeDuration=0,currentStepIndex=0,selectedDestination=null,lookupTimer=null,lookupController=null,lookupSerial=0;
 map.addControl(new maplibregl.NavigationControl({visualizePitch:true}),"top-right");
 const dragonHtml='<div class="dragon-marker proof-arrow"><svg viewBox="0 0 72 84" role="img" aria-label="Červená navigační šipka"><path d="M36 4L68 75 36 60 4 75Z" fill="#ef2638" stroke="#ffffff" stroke-width="5" stroke-linejoin="round"/><path d="M36 19L48 59 36 53 24 59Z" fill="#ff8993" opacity=".7"/></svg><div class="dragon-street" id="dragonStreet">Zjišťuji ulici…</div></div>'
-map.on("load",()=>{const layers=map.getStyle().layers||[];const label=layers.find(l=>l.type==="symbol"&&l.layout&&l.layout["text-field"]);const before=label?label.id:undefined;try{map.addLayer({id:"proof-3d-buildings",source:"openmaptiles","source-layer":"building",type:"fill-extrusion",minzoom:14,paint:{"fill-extrusion-color":["interpolate",["linear"],["get","render_height"],0,"#252b37",80,"#4b2630"],"fill-extrusion-height":["coalesce",["get","render_height"],["get","height"],8],"fill-extrusion-base":["coalesce",["get","render_min_height"],0],"fill-extrusion-opacity":0.82}},before)}catch(e){console.warn("3D buildings unavailable",e)}map.setPitch(42)});
+/* PROOF Underground: dark racing map inspired by early-2000s street-racing games.
+   Preserve map labels and geometry; recolor only supported paint properties. */
+function proofRacingMapStyle(){
+ const layers=map.getStyle()?.layers||[];
+ for(const layer of layers){
+  const id=layer.id.toLowerCase(),type=layer.type;
+  if(id.startsWith("proof-"))continue;
+  const set=(key,value)=>{try{map.setPaintProperty(layer.id,key,value)}catch(e){console.debug("Map paint",layer.id,key,e)}};
+  if(type==="background"){set("background-color","#090c13");continue}
+  if(type==="fill"){
+   if(/water|ocean|lake|river/.test(id)){set("fill-color","#101c2a");continue}
+   if(/park|grass|forest|wood|green|landcover|vegetation/.test(id)){set("fill-color","#121d1b");continue}
+   if(/building/.test(id)){set("fill-color","#282b36");continue}
+   if(/land|residential|industrial|commercial|urban|pedestrian/.test(id)){set("fill-color","#171a22")}
+   continue
+  }
+  if(type==="line"){
+   if(/water|river|stream/.test(id)){set("line-color","#243a50");continue}
+   if(/motorway|trunk|highway/.test(id)){set("line-color","#a78b61");continue}
+   if(/primary|secondary|tertiary/.test(id)){set("line-color","#727d91");continue}
+   if(/road|street|transportation|bridge|tunnel/.test(id)){set("line-color","#485366");continue}
+   if(/boundary|admin/.test(id)){set("line-color","#3a4050")}
+   continue
+  }
+  if(type==="symbol"&&/road|street|place|city|town|village|poi|label|transport/.test(id)){
+   set("text-color",/road|street/.test(id)?"#d7dce5":"#bfc6d1");
+   set("text-halo-color","#0c1018");
+   set("text-halo-width",1.3);
+  }
+ }
+}
+map.on("style.load",()=>{try{proofRacingMapStyle()}catch(e){console.warn("Racing map style fallback",e)}});
+map.on("load",()=>{const layers=map.getStyle().layers||[];const label=layers.find(l=>l.type==="symbol"&&l.layout&&l.layout["text-field"]);const before=label?label.id:undefined;try{map.addLayer({id:"proof-3d-buildings",source:"openmaptiles","source-layer":"building",type:"fill-extrusion",minzoom:14,paint:{"fill-extrusion-color":["interpolate",["linear"],["get","render_height"],0,"#262c39",80,"#57303b"],"fill-extrusion-height":["coalesce",["get","render_height"],["get","height"],8],"fill-extrusion-base":["coalesce",["get","render_min_height"],0],"fill-extrusion-opacity":0.82}},before)}catch(e){console.warn("3D buildings unavailable",e)}map.setPitch(42)});
 
 function openHome(){document.body.classList.add("next-mode","home-mode");document.body.classList.remove("guiding");setTimeout(()=>map.resize(),100);setTimeout(()=>{$("homeSplash").classList.add("done")},5600)}
 function leaveHome(){document.body.classList.remove("home-mode");map.resize()}
