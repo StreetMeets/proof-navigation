@@ -1026,7 +1026,25 @@ function cancelRoute(){
  say("Trasa byla zrušena.");
 }
 $("proofDriveExit").onclick=cancelRoute;$("proofTripExit").onclick=cancelRoute;$("proofTripSearch").onclick=()=>{cancelRoute();openSearch()};$("nextCancel").onclick=cancelRoute;$("cancelRouteSide").onclick=cancelRoute;
-async function geo(q){let r=await fetch("https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q="+encodeURIComponent(q),{headers:{"Accept-Language":"cs"}});if(!r.ok)throw Error("Vyhledávání míst je nedostupné.");let a=await r.json();if(!a.length)throw Error("Místo nebylo nalezeno.");return [+a[0].lat,+a[0].lon]}
+async function geo(q){
+ // Prefer the existing Czech-focused address engine for typed start/destination.
+ // Do not silently route to an unrelated approximate match.
+ try{
+  const places=await proofSearchExactAddress(q);
+  const best=places[0];
+  if(best&&proofAddressScore(best,q,proofSearchFocus())>=90)return [+best.lat,+best.lon];
+ }catch(e){console.warn("Czech address lookup fallback",e)}
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),7000);
+ try{
+  const params=new URLSearchParams({format:"jsonv2",limit:"5",countrycodes:"cz",addressdetails:"1",q});
+  const r=await fetch("https://nominatim.openstreetmap.org/search?"+params,{headers:{"Accept-Language":"cs"},signal:controller.signal});
+  if(!r.ok)throw Error("Vyhledávání míst je dočasně nedostupné.");
+  const a=await r.json();
+  const match=a.find(p=>Number.isFinite(+p.lat)&&Number.isFinite(+p.lon)&&proofInsideCz(+p.lat,+p.lon));
+  if(!match)throw Error("Česká adresa nebyla nalezena. Zkus uvést ulici, číslo domu a obec.");
+  return [+match.lat,+match.lon];
+ }finally{clearTimeout(timer)}
+}
 let smartRoutes=[],smartRouteOrigin=null,smartRouteDestination=null,smartSelectedIndex=0,proofRouteLoading=false;
 function smartMode(){return document.querySelector('input[name="proofRouteMode"]:checked')?.value||"fastest"}
 function smartOrder(){return smartRoutes.map((r,i)=>({r,i})).sort((x,y)=>x.r.duration-y.r.duration)}
