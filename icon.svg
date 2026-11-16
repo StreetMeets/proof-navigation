@@ -1,18 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="PROOF NEXT Navigation – Racing Dragon">
-<defs><radialGradient id="bg"><stop stop-color="#26232c"/><stop offset="1" stop-color="#06070b"/></radialGradient><linearGradient id="red" x2="1" y2="1"><stop stop-color="#ff555c"/><stop offset=".55" stop-color="#ed182a"/><stop offset="1" stop-color="#85000d"/></linearGradient><linearGradient id="metal" x2="0" y2="1"><stop stop-color="#fff"/><stop offset=".45" stop-color="#c7cbd3"/><stop offset="1" stop-color="#6e7582"/></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="7"/></filter></defs>
-<rect width="512" height="512" rx="112" fill="url(#bg)"/>
-<rect x="13" y="13" width="486" height="486" rx="100" fill="none" stroke="#fa2434" stroke-width="7"/>
-<path d="M45 350Q112 242 182 249T313 183 461 101" fill="none" stroke="#ef1d2f" stroke-width="17" stroke-linecap="round" filter="url(#glow)" opacity=".7"/>
-<path d="M45 350Q112 242 182 249T313 183 461 101" fill="none" stroke="#ff3547" stroke-width="9" stroke-linecap="round" stroke-dasharray="18 10"/>
-<path d="M447 78h35l-18 38z" fill="#ff2a3b"/>
-<g transform="translate(55 45)">
-<path d="M18 208Q40 95 142 78Q112 45 125 12Q183 52 213 82Q251 51 299 53L277 82Q327 86 363 118L318 119 340 151 288 140Q271 173 242 192L259 161 214 180 203 226 181 179Q136 215 76 235L107 183 18 208Z" fill="#10131b" stroke="#f33140" stroke-width="9" stroke-linejoin="round"/>
-<path d="M47 174Q79 90 158 105L122 63 191 111Q244 66 302 95L263 115 321 133 267 133 233 164 215 145 171 163 134 143Z" fill="url(#red)"/>
-<path d="M225 112L264 108 246 124Z" fill="#fff2e4"/>
-<path d="M268 140L310 153 273 160 256 181 251 154Z" fill="#f53a48"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="PROOF">
+<defs>
+ <filter id="glow" x="-45%" y="-100%" width="190%" height="300%"><feGaussianBlur stdDeviation="14"/></filter>
+ <filter id="soft" x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation="5"/></filter>
+</defs>
+<rect width="512" height="512" rx="102" fill="#06070b"/>
+<g transform="translate(0 10) skewX(-9)">
+ <text x="256" y="285" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-size="111" font-style="italic" font-weight="900" letter-spacing="-7" fill="#e52443" opacity=".7" filter="url(#glow)">PROOF</text>
+ <text x="256" y="285" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-size="111" font-style="italic" font-weight="900" letter-spacing="-7" fill="#f72e4e" opacity=".65" filter="url(#soft)">PROOF</text>
+ <text x="256" y="285" text-anchor="middle" font-family="Arial Black,Arial,sans-serif" font-size="111" font-style="italic" font-weight="900" letter-spacing="-7" fill="#ffffff">PROOF</text>
 </g>
-<path d="M244 194l-70 125 76-29 49 30-21-82z" fill="url(#red)" stroke="#ff9b9b" stroke-width="5" stroke-linejoin="round"/>
-<text x="256" y="394" text-anchor="middle" fill="url(#metal)" font-family="Arial Black,Arial,sans-serif" font-size="83" font-style="italic" font-weight="900" letter-spacing="-5">PROOF</text>
-<text x="256" y="443" text-anchor="middle" fill="#f72b3d" font-family="Arial Black,Arial,sans-serif" font-size="55" font-style="italic" font-weight="900" letter-spacing="4">NEXT</text>
-<path d="M45 464h112m198 0h112" stroke="#ff2637" stroke-width="5"/>
 </svg>
