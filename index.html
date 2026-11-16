@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101114"><meta name="proof-build" content="speed-limit-gps-hook-2026-11-16"><meta name="description" content="Proof – automobilová navigace"><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon.svg?v=proof-wordmark-1" type="image/svg+xml"><link rel="apple-touch-icon" sizes="180x180" href="./icon.svg?v=proof-wordmark-1"><title>Proof Navigation</title><link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"><style>
+<html lang="cs"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#101114"><meta name="proof-build" content="route-alternatives-improved-2026-11-16"><meta name="description" content="Proof – automobilová navigace"><link rel="manifest" href="./manifest.webmanifest"><link rel="icon" href="./icon.svg?v=proof-wordmark-1" type="image/svg+xml"><link rel="apple-touch-icon" sizes="180x180" href="./icon.svg?v=proof-wordmark-1"><title>Proof Navigation</title><link href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css" rel="stylesheet"><style>
 :root{--bg:#0d0e11;--panel:#17191e;--muted:#9ba1ad;--accent:#e53935;--line:#30343d}*{box-sizing:border-box}body{margin:0;background:var(--bg);color:#f4f5f7;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}header{height:58px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;background:#111318;border-bottom:1px solid var(--line)}.logo{font-size:24px;font-weight:950;letter-spacing:2px}.logo span{color:var(--accent)}.tag{font-size:10px;color:var(--muted);letter-spacing:1.5px}main{display:grid;grid-template-columns:350px 1fr;height:calc(100dvh - 58px)}aside{padding:15px;background:var(--panel);overflow:auto;border-right:1px solid var(--line)}h1{font-size:20px;margin:3px 0 6px}.muted{font-size:12px;color:var(--muted);line-height:1.45;margin:0 0 13px}label{display:block;font-size:10px;color:var(--muted);font-weight:800;letter-spacing:1px;margin:12px 0 6px}input{width:100%;padding:12px;border-radius:10px;border:1px solid var(--line);background:#101217;color:white;font-size:14px}.themes{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.theme{background:#101217;border:1px solid var(--line);color:#bbb;border-radius:8px;padding:8px 3px;font-size:10px;font-weight:800}.theme:before{content:"";display:block;height:4px;border-radius:4px;background:var(--sw);margin-bottom:6px}.theme.active{border-color:var(--accent);color:white}.actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-top:9px}button{cursor:pointer;border:0;border-radius:9px;padding:12px 8px;background:var(--accent);color:white;font-weight:850;font-size:11px}button.secondary{background:#242830;border:1px solid var(--line)}button:disabled{opacity:.45}.status,.nav{background:#101217;border:1px solid var(--line);border-radius:9px;padding:11px;margin-top:10px;font-size:12px;color:var(--muted);line-height:1.5}.nav{display:none;background:#291719;border-color:#633033;color:#fff}.stats{display:none;grid-template-columns:1fr 1fr;gap:8px;margin-top:9px}.stat{padding:10px;background:#242830;border-radius:9px}.stat b{display:block;font-size:18px}.stat small{color:var(--muted)}#map{height:100%;width:100%;background:#222}.mapwrap{position:relative}.mapbadge{position:absolute;z-index:500;top:12px;right:12px;background:#111d;padding:9px;border:1px solid var(--line);border-radius:8px;font-size:10px;letter-spacing:1px}footer{font-size:10px;color:var(--muted);line-height:1.5;margin-top:12px}@media(max-width:760px){main{display:flex;flex-direction:column;height:calc(100dvh - 58px)}.mapwrap{height:48%;min-height:210px;order:1}aside{height:52%;order:2;border:0;border-top:1px solid var(--line);padding:10px 12px}h1{font-size:18px}.muted{margin-bottom:6px}label{margin-top:8px}footer{margin-top:8px}}
 
 /* PROOF NEXT – full-screen Waze-inspired driving mode */
@@ -935,14 +935,39 @@ async function proofAvoidHighways(a,b){
   return {geometry:{coordinates:coords},distance:data.trip.summary.length*1000,duration:data.trip.summary.time,legs:[{steps}],proofMode:"avoid",proofHighwayCaveat:true};
  }finally{clearTimeout(timer)}
 }
+async function proofShortestRoute(a,b){
+ // Optional shortest-distance route; never delay the reliable OSRM route.
+ const payload={locations:[{lat:a[0],lon:a[1]},{lat:b[0],lon:b[1]}],costing:"auto",costing_options:{auto:{shortest:true}},directions_options:{units:"kilometers",language:"cs-CZ"}};
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),9000);
+ try{
+  const res=await fetch("https://valhalla1.openstreetmap.de/route?json="+encodeURIComponent(JSON.stringify(payload)),{signal:controller.signal});
+  if(!res.ok)throw Error("Shortest router HTTP "+res.status);
+  const data=await res.json();if(!data.trip?.legs?.length)throw Error("Shortest route missing");
+  const decode=str=>{let i=0,lat=0,lon=0,out=[];while(i<str.length){const read=()=>{let value=0,shift=0,b;do{b=str.charCodeAt(i++)-63;value|=(b&31)<<shift;shift+=5}while(b>=32&&i<str.length);return value&1?~(value>>1):value>>1};lat+=read();lon+=read();out.push([lon/1e6,lat/1e6])}return out};
+  const coords=[],steps=[];
+  for(const leg of data.trip.legs){const points=decode(leg.shape||"");if(!points.length)continue;if(coords.length)points.shift();coords.push(...points);for(const m of leg.maneuvers||[]){const point=decode(leg.shape||"")[m.begin_shape_index];if(point)steps.push({distance:(m.length||0)*1000,duration:m.time||0,name:m.street_names?.[0]||"",maneuver:{type:m.type===4?"arrive":"turn",modifier:"straight",location:point},geometry:{coordinates:[]},proofInstruction:m.instruction||""})}}
+  if(coords.length<2)throw Error("Shortest route geometry missing");
+  return {geometry:{coordinates:coords},distance:data.trip.summary.length*1000,duration:data.trip.summary.time,legs:[{steps}],proofMode:"shortest",proofShortestCalculated:true};
+ }finally{clearTimeout(timer)}
+}
 async function getRoute(a,b){
- const url="https://router.project-osrm.org/route/v1/driving/"+a[1]+","+a[0]+";"+b[1]+","+b[0]+"?overview=full&geometries=geojson&steps=true&alternatives=true";
+ const url="https://router.project-osrm.org/route/v1/driving/"+a[1]+","+a[0]+";"+b[1]+","+b[0]+"?overview=full&geometries=geojson&steps=true&alternatives=3";
  const routeController=new AbortController(),routeTimer=setTimeout(()=>routeController.abort(),12000);let response;try{response=await fetch(url,{signal:routeController.signal})}finally{clearTimeout(routeTimer)};if(!response.ok)throw Error("Výpočet trasy není dostupný ("+response.status+").");
  const data=await response.json();if(data.code!=="Ok"||!Array.isArray(data.routes)||!data.routes.length)throw Error("Trasu nelze vypočítat.");
  const routes=data.routes.filter(r=>r.geometry?.coordinates?.length>1&&Number.isFinite(r.distance)&&Number.isFinite(r.duration));
  if(!routes.length)throw Error("Router nevrátil platnou trasu.");
  const fastest=routes.reduce((x,y)=>x.duration<y.duration?x:y),shortest=routes.reduce((x,y)=>x.distance<y.distance?x:y);
  smartRoutes=[{...fastest,proofMode:"fastest"},{...shortest,proofMode:"shortest"}];
+ const shortestPromise=proofShortestRoute(a,b).then(route=>{
+  if(smartRouteOrigin?.[0]!==a[0]||smartRouteOrigin?.[1]!==a[1]||smartRouteDestination?.[0]!==b[0]||smartRouteDestination?.[1]!==b[1])return;
+  const existing=smartRoutes.find(r=>r.proofMode==="shortest");
+  if(!existing||route.distance>=existing.distance-100)return;
+  const wasSelected=smartRoutes[smartSelectedIndex]?.proofMode==="shortest";
+  smartRoutes=smartRoutes.map(r=>r.proofMode==="shortest"?route:r);
+  if(wasSelected&&!document.body.classList.contains("guiding")){smartSelectedIndex=smartRoutes.indexOf(route);show(route,a,b)}
+  smartRender();proofDrawRouteAlternatives();
+ }).catch(e=>console.warn("Optional shortest route unavailable",e));
+
  /* Do not block normal navigation for a slow optional route service. */
  const avoidPromise=proofAvoidHighways(a,b).then(avoid=>{if(smartRouteOrigin?.[0]===a[0]&&smartRouteOrigin?.[1]===a[1]&&smartRouteDestination?.[0]===b[0]&&smartRouteDestination?.[1]===b[1]){smartRoutes=smartRoutes.filter(r=>r.proofMode!=="avoid");smartRoutes.push(avoid);smartRender();proofDrawRouteAlternatives()}}).catch(e=>console.warn("Optional motorway avoidance unavailable",e));
  smartRouteOrigin=a.slice();smartRouteDestination=b.slice();
