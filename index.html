@@ -1026,6 +1026,36 @@ function cancelRoute(){
  say("Trasa byla zrušena.");
 }
 $("proofDriveExit").onclick=cancelRoute;$("proofTripExit").onclick=cancelRoute;$("proofTripSearch").onclick=()=>{cancelRoute();openSearch()};$("nextCancel").onclick=cancelRoute;$("cancelRouteSide").onclick=cancelRoute;
+// Set this to the deployed Cloudflare Worker URL after provisioning the address database.
+const PROOF_ADDRESS_API="";
+async function proofSearchExactAddress(q){
+ const focus=proofSearchFocus();
+ if(PROOF_ADDRESS_API){
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),4500);
+  try{
+   const url=new URL("/search",PROOF_ADDRESS_API);
+   url.searchParams.set("q",q);
+   const response=await fetch(url,{signal:controller.signal});
+   if(response.ok){
+    const data=await response.json();
+    const results=(data.results||[]).filter(x=>Number.isFinite(+x.lat)&&Number.isFinite(+x.lon)).map(x=>({
+     title:[x.street||x.city,x.house].filter(Boolean).join(" "),
+     detail:[x.city,x.postcode].filter(Boolean).join(", "),
+     display_name:[x.street||x.city,x.house,x.city].filter(Boolean).join(" "),
+     lat:+x.lat,lon:+x.lon,countryCode:"CZ",street:x.street||"",house:x.house||""
+    }));
+    if(results.length)return proofDedupePlaces(results,q);
+   }
+  }catch(e){console.warn("PROOF address API fallback",e)}finally{clearTimeout(timer)}
+ }
+ const results=[];
+ for(const query of proofAddressQueries(q).slice(0,3)){
+  try{results.push(...await proofPhotonRequest(query,undefined,focus))}
+  catch(e){console.warn("Photon address search",e)}
+  if(proofDedupePlaces(results,q).some(p=>proofAddressScore(p,q,focus)>115))break;
+ }
+ return proofDedupePlaces(results,q);
+}
 async function geo(q){
  // Prefer the existing Czech-focused address engine for typed start/destination.
  // Do not silently route to an unrelated approximate match.
