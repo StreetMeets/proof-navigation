@@ -436,13 +436,44 @@ function setGpsSpeed(coords,point){
  if(document.body.classList.contains("guiding"))proofUpdateSpeedLimit(point,coords.accuracy);
  if(speed!==null&&Number.isFinite(speed)){if(coords.accuracy>35&&coords.speed===null)return;speed=Math.min(260,speed);lastSpeed=lastSpeed===0?speed:lastSpeed*.65+speed*.35;$("nextSpeed").textContent=String(Math.round(lastSpeed))} 
 }
-async function updateStreet(point,force=false){
- const now=Date.now();if(!force&&now-lastStreetAt<12000)return;
- if(!force&&lastStreetPoint){const d=haversine(point,lastStreetPoint);if(d<40)return}
- lastStreetAt=now;lastStreetPoint=point.slice();
- try{const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),5000);let r;try{r=await fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat="+point[0]+"&lon="+point[1]+"&zoom=18&addressdetails=1",{headers:{"Accept-Language":"cs"},signal:controller.signal})}finally{clearTimeout(timer)};if(!r.ok)throw Error("reverse geocoding failed");const j=await r.json(),a=j.address||{},street=a.road||a.pedestrian||a.residential||a.footway||a.path||a.cycleway||a.neighbourhood||a.suburb||"Neznámá ulice";const el=document.getElementById("dragonStreet");if(el)el.textContent=street}catch(e){const el=document.getElementById("dragonStreet");if(el)el.textContent="Aktuální poloha"}
+let proofStreetRequest=0;
+function proofStreetLabel(value){
+ const el=document.getElementById("dragonStreet");
+ if(el)el.textContent=value||"Aktuální poloha";
 }
-function updateDragon(point){if(dragonMarker)dragonMarker.setLngLat([point[1],point[0]]);updateStreet(point)}
+function proofRouteStreet(point){
+ if(!routeSteps.length||!coords.length)return "";
+ const matched=routeMatch(point);
+ if(!Number.isFinite(matched.distance)||matched.distance>22)return "";
+ const step=routeSteps.find(s=>matched.progress>=s.start-5&&matched.progress<s.end-2);
+ return String(step?.name||"").trim();
+}
+async function updateStreet(point,force=false,accuracy=Infinity){
+ const now=Date.now();
+ // GPS is authoritative. Never show a road name if the position is too uncertain.
+ if(!Number.isFinite(accuracy)||accuracy>35){proofStreetLabel("GPS poloha se upřesňuje");return}
+ const onRoute=proofRouteStreet(point);
+ if(onRoute){proofStreetLabel(onRoute);return}
+ if(!force&&now-lastStreetAt<18000)return;
+ if(!force&&lastStreetPoint&&haversine(point,lastStreetPoint)<55)return;
+ lastStreetAt=now;lastStreetPoint=point.slice();
+ const request=++proofStreetRequest;
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),5500);
+ try{
+  const r=await fetch("https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat="+encodeURIComponent(point[0])+"&lon="+encodeURIComponent(point[1])+"&zoom=17&addressdetails=1",{headers:{"Accept-Language":"cs"},signal:controller.signal});
+  if(!r.ok)throw Error("reverse HTTP "+r.status);
+  const j=await r.json(),a=j.address||{};
+  const street=a.road||a.pedestrian||a.residential||a.living_street||a.footway||"";
+  // Reject remote reverse-geocoder results; no invented street name.
+  const d=Number.isFinite(+j.lat)&&Number.isFinite(+j.lon)?haversine(point,[+j.lat,+j.lon]):Infinity;
+  if(request===proofStreetRequest)proofStreetLabel(street&&d<90?street:"Aktuální poloha");
+ }catch(e){if(request===proofStreetRequest)proofStreetLabel("Aktuální poloha")}
+ finally{clearTimeout(timer)}
+}
+function updateDragon(point,accuracy=Infinity){
+ if(dragonMarker)dragonMarker.setLngLat([point[1],point[0]]);
+ updateStreet(point,false,accuracy);
+}
 
 function maneuverInfo(step){
  const m=step.maneuver||{},type=m.type||"continue",mod=m.modifier||"",name=step.name||"";
@@ -828,7 +859,7 @@ document.querySelectorAll('input[name="proofRouteMode"]').forEach(r=>r.addEventL
 $("nextFind").onclick=()=>{hideSuggestions();$("dest").value=$("nextDest").value.trim();$("find").click()};
 
 $("nextStart").onclick=()=>$("start").click();$("nextStop").onclick=()=>$("stop").click();
-$("start").onclick=async()=>{try{let p=await gps();$("start").disabled=true;$("stop").disabled=false;$("nav").style.display="block";$("navtitle").textContent="Navigace běží";$("navdetail").textContent="Při odchylce od trasy provedu přepočet.";say("Navigace spuštěna. Nech aplikaci otevřenou.");$("nextStart").disabled=true;$("nextStop").disabled=false;$("nextHint").textContent="Navigace aktivní – sleduji tvoji polohu.";document.body.classList.add("guiding");updateGuidance(p);watch=navigator.geolocation.watchPosition(async x=>{let q=[x.coords.latitude,x.coords.longitude];if(!Number.isFinite(x.coords.accuracy)||x.coords.accuracy>65)return;setGpsSpeed(x.coords,q);const match=routeMatch(q),snapThreshold=Math.max(18,Math.min(35,x.coords.accuracy*1.2));const snapped=match.distance<snapThreshold?match.position:q;updateDragon(snapped);updateGuidance(q,match);const heading=Number.isFinite(x.coords.heading)&&x.coords.speed>1.5?x.coords.heading:map.getBearing();map.easeTo({center:[snapped[1],snapped[0]],bearing:heading,zoom:17,pitch:62,duration:650});const deviation=Math.max(65,x.coords.accuracy*2.5);offCount=match.distance>deviation?offCount+1:0;if(offCount>=3){offCount=0;await recalc(q)}else say("Navigace aktivní • GPS přesnost "+Math.round(x.coords.accuracy)+" m");},e=>say(e.code===1?"Přístup k poloze byl odebrán.":"GPS signál je nedostupný."),{enableHighAccuracy:true,maximumAge:3000,timeout:15000});map.easeTo({center:[p[1],p[0]],zoom:17,pitch:62,duration:700})}catch(e){say(e.message)}};
+$("start").onclick=async()=>{try{let p=await gps();$("start").disabled=true;$("stop").disabled=false;$("nav").style.display="block";$("navtitle").textContent="Navigace běží";$("navdetail").textContent="Při odchylce od trasy provedu přepočet.";say("Navigace spuštěna. Nech aplikaci otevřenou.");$("nextStart").disabled=true;$("nextStop").disabled=false;$("nextHint").textContent="Navigace aktivní – sleduji tvoji polohu.";document.body.classList.add("guiding");updateGuidance(p);watch=navigator.geolocation.watchPosition(async x=>{let q=[x.coords.latitude,x.coords.longitude];if(!Number.isFinite(x.coords.accuracy)||x.coords.accuracy>65)return;setGpsSpeed(x.coords,q);const match=routeMatch(q),snapThreshold=Math.max(18,Math.min(35,x.coords.accuracy*1.2));const snapped=match.distance<snapThreshold?match.position:q;updateDragon(snapped,x.coords.accuracy);updateGuidance(q,match);const heading=Number.isFinite(x.coords.heading)&&x.coords.speed>1.5?x.coords.heading:map.getBearing();map.easeTo({center:[snapped[1],snapped[0]],bearing:heading,zoom:17,pitch:62,duration:650});const deviation=Math.max(65,x.coords.accuracy*2.5);offCount=match.distance>deviation?offCount+1:0;if(offCount>=3){offCount=0;await recalc(q)}else say("Navigace aktivní • GPS přesnost "+Math.round(x.coords.accuracy)+" m");},e=>say(e.code===1?"Přístup k poloze byl odebrán.":"GPS signál je nedostupný."),{enableHighAccuracy:true,maximumAge:3000,timeout:15000});map.easeTo({center:[p[1],p[0]],zoom:17,pitch:62,duration:700})}catch(e){say(e.message)}};
 $("stop").onclick=()=>{if(watch!==null)navigator.geolocation.clearWatch(watch);watch=null;$("start").disabled=false;$("stop").disabled=true;$("nav").style.display="none";if("speechSynthesis"in window)speechSynthesis.cancel();say("Navigace ukončena.");$("nextStart").disabled=false;$("nextStop").disabled=true;document.body.classList.remove("guiding");$("nextHint").textContent="Navigace ukončena. Můžeš naplánovat další trasu."};
 
 const emberBox=document.getElementById("proofEmbers");if(emberBox){for(let i=0;i<45;i++){const p=document.createElement("i");p.style.setProperty("--x",(24+(i*37%57))+"%");p.style.setProperty("--y",(20+(i*29%58))+"%");p.style.setProperty("--size",(1+i%4)+"px");p.style.setProperty("--duration",(1.2+i%6*.3)+"s");p.style.setProperty("--delay",(i%17*.17)+"s");p.style.setProperty("--dx",((i*43%170)-85)+"px");p.style.setProperty("--dy",(-35-i*19%190)+"px");emberBox.append(p)}}
