@@ -668,7 +668,7 @@ function renderPlaces(places,emptyMessage){
  if(!places.length){const el=document.createElement("div");el.className="ps-message";el.textContent=emptyMessage||"Zkus upřesnit název místa nebo adresu.";psResults.append(el)}
  for(const p of places){
   const btn=document.createElement("button");btn.type="button";btn.className="ps-item";
-  const pin=document.createElement("span");pin.className="ps-icon";pin.textContent=p.recent?"◷":"⌖";
+  const pin=document.createElement("span");pin.className="ps-icon";pin.textContent=p.fuelStation?"⛽":p.recent?"◷":"⌖";
   const copy=document.createElement("span");copy.className="ps-copy";
   const title=document.createElement("span");title.className="ps-title";title.textContent=p.title||p.display_name;
   const detail=document.createElement("span");detail.className="ps-detail";detail.textContent=p.detail||p.display_name;
@@ -740,11 +740,60 @@ async function proofPhotonRequest(q,signal,focus){
  const data=await r.json();
  return (data.features||[]).filter(f=>Array.isArray(f.geometry?.coordinates)).map(proofPhotonPlace);
 }
+
+// Fuel station search uses real OSM coordinates and addresses (no invented station list).
+// Search manually by brand or "benzínka"; ordinary address autocomplete stays unchanged.
+const proofFuelBrands=["shell","omv","orlen","benzina","mol","eurooil","tank ono","ono","robin oil","robin-oil","pap oil","prim","avanti","lukoil","fuel","benzinka","benzinka","benzinova stanice","cerpaci stanice","pumpa"];
+function proofFuelQuery(q){
+ const normalized=czNormalize(q).replace(/[^a-z0-9 ]/g," ").replace(/\s+/g," ").trim();
+ if(!normalized||normalized.length<3)return null;
+ const brand=proofFuelBrands.find(x=>normalized===x||normalized.startsWith(x+" "));
+ return brand?{brand:brand==="benzina"?"orlen":brand==="ono"?"tank ono":brand,generic:["fuel","benzinka","benzinova stanice","cerpaci stanice","pumpa"].includes(brand)}:null;
+}
+async function proofFuelStations(q,signal,focus){
+ const requested=proofFuelQuery(q);
+ if(!requested)return [];
+ // Never assume the user is in Prague. With no GPS/map focus, use nationwide bounding box.
+ const location=focus&&proofInsideCz(focus[0],focus[1])?focus:null;
+ const filter=location?'(around:35000,'+location[0]+','+location[1]+')':'(48.55,12.09,51.06,18.87)';
+ const query='[out:json][timeout:18];nwr["amenity"="fuel"]'+filter+';out center 1800;';
+ const endpoints=["https://overpass.kumi.systems/api/interpreter","https://overpass.nchc.org.tw/api/interpreter"];
+ let data=null,lastError;
+ for(const endpoint of endpoints){
+  if(signal?.aborted)throw new DOMException("Aborted","AbortError");
+  const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),10500);
+  const abort=()=>controller.abort();
+  signal?.addEventListener("abort",abort,{once:true});
+  try{
+   const r=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:"data="+encodeURIComponent(query),signal:controller.signal});
+   if(!r.ok)throw Error("Fuel search HTTP "+r.status);
+   data=await r.json();break;
+  }catch(e){lastError=e;if(signal?.aborted)throw new DOMException("Aborted","AbortError")}
+  finally{clearTimeout(timer);signal?.removeEventListener("abort",abort)}
+ }
+ if(!data){console.warn("Fuel station source unavailable",lastError);return []}
+ const matches=(data.elements||[]).map(el=>{
+  const tags=el.tags||{},lat=el.lat??el.center?.lat,lon=el.lon??el.center?.lon;
+  if(!Number.isFinite(lat)||!Number.isFinite(lon)||!proofInsideCz(lat,lon))return null;
+  const name=tags.name||tags.brand||tags.operator||"Čerpací stanice";
+  const searchable=czNormalize([name,tags.brand,tags.operator].join(" "));
+  if(!requested.generic&&!searchable.includes(requested.brand))return null;
+  const address=[tags["addr:street"],tags["addr:housenumber"]].filter(Boolean).join(" ");
+  const city=tags["addr:city"]||tags["addr:place"]||"";
+  const detail=[address,city,tags["addr:postcode"]].filter(Boolean).join(", ")||"Adresa není v OSM uvedena";
+  return {title:name,detail,display_name:name+" · "+detail,lat,lon,countryCode:"CZ",fuelStation:true};
+ }).filter(Boolean);
+ matches.sort((a,b)=>location?haversine(location,[a.lat,a.lon])-haversine(location,[b.lat,b.lon]):a.title.localeCompare(b.title,"cs"));
+ return matches.slice(0,35);
+}
 async function searchProviders(q,signal){
  const focus=proofSearchFocus(),cacheKey=czNormalize(q)+"|"+(focus?focus.map(n=>n.toFixed(2)).join(","):"cz");
  const cached=proofAddressCache.get(cacheKey);
  if(cached&&Date.now()-cached.at<300000)return cached.places;
  const queries=proofAddressQueries(q),results=[];
+ if(proofFuelQuery(q)){
+  try{results.push(...await proofFuelStations(q,signal,focus))}catch(err){if(err.name==="AbortError")throw err;console.warn("Fuel stations",err)}
+ }
  for(const query of queries.slice(0,2)){
   if(signal?.aborted)throw new DOMException("Aborted","AbortError");
   try{results.push(...await proofPhotonRequest(query,signal,focus))}
@@ -752,7 +801,7 @@ async function searchProviders(q,signal){
   if(proofDedupePlaces(results,q).filter(p=>proofAddressScore(p,q,focus)>100).length>=5)break;
  }
  const tokens=czNormalize(q).split(/[\\s,]+/).filter(w=>w.length>=2);
- const places=proofDedupePlaces(results,q).filter(p=>tokens.some(w=>czNormalize(p.display_name).includes(w)));
+ const places=proofDedupePlaces(results,q).filter(p=>p.fuelStation||tokens.some(w=>czNormalize(p.display_name).includes(w)));
  proofAddressCache.set(cacheKey,{at:Date.now(),places});
  if(proofAddressCache.size>80)proofAddressCache.delete(proofAddressCache.keys().next().value);
  return places;
