@@ -1,0 +1,5 @@
+name = "proof-next-addresses"
+main = "worker.js"
+compatibility_date = "2026-11-01"
+# Create D1 using: npx wrangler d1 create proof-next-addresses
+# Then add [[d1_databases]] binding = "DB", database_name = "proof-next-addresses", database_id = "<actual ID>"
