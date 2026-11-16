@@ -350,54 +350,51 @@ function proofRacingMapStyle(){
    The imagery is 10m resolution, not building-level aerial photography. */
 let proofMapTheme="dark";
 try{proofMapTheme=localStorage.getItem("proofMapTheme")==="light"?"light":"dark"}catch(e){}
+/* Crisp, road-first vector map. Satellite raster disabled: its 10m imagery was blurry at street zoom. */
 function proofApplyMapTheme(){
  const light=proofMapTheme==="light";
- const satellite=map.getLayer("proof-satellite-layer");
- if(satellite){
-  map.setPaintProperty("proof-satellite-layer","raster-brightness-max",light?1:0.78);
-  map.setPaintProperty("proof-satellite-layer","raster-contrast",light?0.03:0.18);
-  map.setPaintProperty("proof-satellite-layer","raster-saturation",light?0.12:-0.17);
- }
+ const palette=light?{
+ bg:"#edf1f3",land:"#edf1f3",park:"#cfe4d6",water:"#b6dce9",building:"#d5dce1",road:"#ffffff",major:"#fff6e6",motorway:"#f8d7a6",edge:"#b4c0ca",label:"#263441",halo:"#ffffff"
+ }:{
+ bg:"#111b26",land:"#182531",park:"#203e38",water:"#183b52",building:"#344452",road:"#718594",major:"#c5b49b",motorway:"#e4a96b",edge:"#101c29",label:"#e8f1f7",halo:"#101a25"
+ };
  const layers=map.getStyle()?.layers||[];
  for(const layer of layers){
-  if(layer.type!=="symbol"||layer.id.startsWith("proof-"))continue;
-  try{map.setPaintProperty(layer.id,"text-color",light?"#f9fafb":"#ffffff");map.setPaintProperty(layer.id,"text-halo-color",light?"#26313b":"#080c14");map.setPaintProperty(layer.id,"text-halo-width",light?2.3:2)}catch(e){}
+  const id=layer.id.toLowerCase(),set=(key,value)=>{try{map.setPaintProperty(layer.id,key,value)}catch(e){}};
+  if(id.startsWith("proof-"))continue;
+  if(layer.type==="background"){set("background-color",palette.bg);continue}
+  if(layer.type==="fill"){
+   set("fill-opacity",1);
+   if(/water|ocean|lake|river/.test(id))set("fill-color",palette.water);
+   else if(/park|grass|forest|wood|green|landcover|vegetation/.test(id))set("fill-color",palette.park);
+   else if(/building/.test(id))set("fill-color",palette.building);
+   else set("fill-color",palette.land);
+  }
+  if(layer.type==="line"){
+   set("line-opacity",1);
+   if(/water|river|stream/.test(id))set("line-color",palette.water);
+   else if(/motorway|trunk/.test(id))set("line-color",palette.motorway);
+   else if(/primary|secondary|tertiary/.test(id))set("line-color",palette.major);
+   else if(/road|street|transportation|bridge|tunnel/.test(id))set("line-color",palette.road);
+   else if(/boundary|admin/.test(id))set("line-color",palette.edge);
+  }
+  if(layer.type==="symbol"){
+   set("text-color",palette.label);
+   set("text-halo-color",palette.halo);
+   set("text-halo-width",light?1.8:1.5);
+  }
  }
+ if(map.getLayer("proof-satellite-layer"))map.setLayoutProperty("proof-satellite-layer","visibility","none");
  if(map.getLayer("proof-3d-buildings")){
-  try{map.setPaintProperty("proof-3d-buildings","fill-extrusion-opacity",light?0.38:0.62)}catch(e){}
+  map.setPaintProperty("proof-3d-buildings","fill-extrusion-color",light?"#c2ccd3":"#334653");
+  map.setPaintProperty("proof-3d-buildings","fill-extrusion-opacity",light?.36:.31);
  }
  const btn=document.getElementById("proofThemeToggle");
- if(btn){btn.textContent=light?"☾":"☀";btn.title=light?"Přepnout na tmavou mapu":"Přepnout na světlou mapu";btn.setAttribute("aria-label",btn.title)}
+ if(btn){btn.textContent=light?"☾":"☀";btn.title=light?"Tmavá mapa":"Světlá mapa";btn.setAttribute("aria-label",btn.title)}
  document.body.classList.toggle("proof-map-light",light);
 }
-function proofHybridSatellite(){
- const layers=map.getStyle()?.layers||[];
- if(!map.getSource("proof-satellite")){
-  map.addSource("proof-satellite",{type:"raster",tiles:["https://tiles.maps.eox.at/wmts/1.0.0/s2cloudless_3857/default/GoogleMapsCompatible/{z}/{y}/{x}.jpg"],tileSize:256,maxzoom:13,attribution:'EOxCloudless <a href="https://cloudless.eox.at" target="_blank" rel="noopener">EOX IT Services GmbH</a> · modified Copernicus Sentinel data 2016 (CC BY 4.0)'});
- }
- const firstNonBackground=layers.find(l=>l.type!=="background");
- if(!map.getLayer("proof-satellite-layer"))map.addLayer({id:"proof-satellite-layer",type:"raster",source:"proof-satellite",paint:{"raster-opacity":1,"raster-brightness-max":0.95,"raster-contrast":0.14,"raster-saturation":-0.08,"raster-fade-duration":250}},firstNonBackground?.id);
- for(const layer of layers){
-  if(layer.id.startsWith("proof-"))continue;
-  try{
-   if(layer.type==="fill")map.setPaintProperty(layer.id,"fill-opacity",0);
-   if(layer.type==="line"){
-    const id=layer.id.toLowerCase();
-    if(/road|transportation|motorway|trunk|primary|secondary|tertiary|street/.test(id)){
-     map.setPaintProperty(layer.id,"line-opacity",0.72);
-     map.setPaintProperty(layer.id,"line-color","#f0e4d1");
-    }else map.setPaintProperty(layer.id,"line-opacity",0.2);
-   }
-   if(layer.type==="symbol"){
-    map.setPaintProperty(layer.id,"text-color","#fffaf2");
-    map.setPaintProperty(layer.id,"text-halo-color","#0b1118");
-    map.setPaintProperty(layer.id,"text-halo-width",2);
-   }
-  }catch(e){console.debug("Hybrid styling",layer.id,e)}
- }
-}
-map.on("style.load",()=>{try{proofHybridSatellite();proofApplyMapTheme()}catch(e){console.warn("Satellite layer unavailable, retaining vector map",e)}});
-map.on("load",()=>{const layers=map.getStyle().layers||[];const label=layers.find(l=>l.type==="symbol"&&l.layout&&l.layout["text-field"]);const before=label?label.id:undefined;try{map.addLayer({id:"proof-3d-buildings",source:"openmaptiles","source-layer":"building",type:"fill-extrusion",minzoom:14,paint:{"fill-extrusion-color":["interpolate",["linear"],["get","render_height"],0,"#262c39",80,"#57303b"],"fill-extrusion-height":["coalesce",["get","render_height"],["get","height"],8],"fill-extrusion-base":["coalesce",["get","render_min_height"],0],"fill-extrusion-opacity":0.48}},before)}catch(e){console.warn("3D buildings unavailable",e)}map.setPitch(48)});
+map.on("style.load",()=>{try{proofApplyMapTheme()}catch(e){console.warn("Map styling",e)}});
+map.on("load",()=>{const layers=map.getStyle().layers||[];const label=layers.find(l=>l.type==="symbol"&&l.layout&&l.layout["text-field"]);const before=label?label.id:undefined;try{map.addLayer({id:"proof-3d-buildings",source:"openmaptiles","source-layer":"building",type:"fill-extrusion",minzoom:14,paint:{"fill-extrusion-color":["interpolate",["linear"],["get","render_height"],0,"#262c39",80,"#57303b"],"fill-extrusion-height":["coalesce",["get","render_height"],["get","height"],8],"fill-extrusion-base":["coalesce",["get","render_min_height"],0],"fill-extrusion-opacity":0.48}},before)}catch(e){console.warn("3D buildings unavailable",e)}map.setPitch(38);proofApplyMapTheme()});
 
 function openHome(){document.body.classList.add("next-mode","home-mode");document.body.classList.remove("guiding");setTimeout(()=>map.resize(),100);setTimeout(()=>{$("homeSplash").classList.add("done")},5600)}
 function leaveHome(){document.body.classList.remove("home-mode");map.resize()}
