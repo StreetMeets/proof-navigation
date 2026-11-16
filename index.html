@@ -735,9 +735,14 @@ function proofDedupePlaces(places,q){
 async function proofPhotonRequest(q,signal,focus){
  const params=new URLSearchParams({q,limit:"35",bbox:"12.09,48.55,18.87,51.06",lang:"default"});
  if(focus){params.set("lat",String(focus[0]));params.set("lon",String(focus[1]));params.set("zoom","12");params.set("location_bias_scale","0.6")}
- const r=await fetch("https://photon.komoot.io/api/?"+params,{signal,headers:{"Accept":"application/json"}});
- if(!r.ok)throw Error("Photon HTTP "+r.status);
- const data=await r.json();
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),6500);
+ const abort=()=>controller.abort();signal?.addEventListener("abort",abort,{once:true});
+ let data;
+ try{const r=await fetch("https://photon.komoot.io/api/?"+params,{signal:controller.signal,headers:{"Accept":"application/json"}});
+  if(!r.ok)throw Error("Photon HTTP "+r.status);
+  data=await r.json();
+ }catch(e){if(signal?.aborted)throw new DOMException("Aborted","AbortError");throw e}
+ finally{clearTimeout(timer);signal?.removeEventListener("abort",abort)}
  return (data.features||[]).filter(f=>Array.isArray(f.geometry?.coordinates)).map(proofPhotonPlace);
 }
 
@@ -755,7 +760,7 @@ async function proofFuelStations(q,signal,focus){
  if(!requested)return [];
  // Never assume the user is in Prague. With no GPS/map focus, use nationwide bounding box.
  const location=focus&&proofInsideCz(focus[0],focus[1])?focus:null;
- const filter=location?'(around:35000,'+location[0]+','+location[1]+')':'(48.55,12.09,51.06,18.87)';
+ const filter=location?'(around:20000,'+location[0]+','+location[1]+')':'(48.55,12.09,51.06,18.87)';
  const query='[out:json][timeout:15];nwr["amenity"="fuel"]'+filter+';out center 600;';
  const endpoints=["https://overpass.kumi.systems/api/interpreter","https://overpass.nchc.org.tw/api/interpreter"];
  let data=null,lastError;
@@ -971,7 +976,7 @@ document.querySelectorAll('input[name="proofRouteMode"]').forEach(r=>r.addEventL
 $("nextFind").onclick=()=>{hideSuggestions();$("dest").value=$("nextDest").value.trim();$("find").click()};
 
 $("nextStart").onclick=()=>$("start").click();$("nextStop").onclick=()=>$("stop").click();
-$("start").onclick=async()=>{try{let p=await gps();$("start").disabled=true;$("stop").disabled=false;$("nav").style.display="block";$("navtitle").textContent="Navigace běží";$("navdetail").textContent="Při odchylce od trasy provedu přepočet.";say("Navigace spuštěna. Nech aplikaci otevřenou.");$("nextStart").disabled=true;$("nextStop").disabled=false;$("nextHint").textContent="Navigace aktivní – sleduji tvoji polohu.";document.body.classList.add("guiding");updateGuidance(p);watch=navigator.geolocation.watchPosition(async x=>{let q=[x.coords.latitude,x.coords.longitude];if(!Number.isFinite(x.coords.accuracy)||x.coords.accuracy>65)return;setGpsSpeed(x.coords,q);const match=routeMatch(q),snapThreshold=Math.max(18,Math.min(35,x.coords.accuracy*1.2));const snapped=match.distance<snapThreshold?match.position:q;updateDragon(snapped,x.coords.accuracy);updateGuidance(q,match);const heading=Number.isFinite(x.coords.heading)&&x.coords.speed>1.5?x.coords.heading:map.getBearing();map.easeTo({center:[snapped[1],snapped[0]],bearing:heading,zoom:17,pitch:62,duration:650});const deviation=Math.max(65,x.coords.accuracy*2.5);offCount=match.distance>deviation?offCount+1:0;if(offCount>=3){offCount=0;await recalc(q)}else say("Navigace aktivní • GPS přesnost "+Math.round(x.coords.accuracy)+" m");},e=>say(e.code===1?"Přístup k poloze byl odebrán.":"GPS signál je nedostupný."),{enableHighAccuracy:true,maximumAge:3000,timeout:15000});map.easeTo({center:[p[1],p[0]],zoom:17,pitch:62,duration:700})}catch(e){say(e.message)}};
+$("start").onclick=async()=>{try{let p=await gps();$("start").disabled=true;$("stop").disabled=false;$("nav").style.display="block";$("navtitle").textContent="Navigace běží";$("navdetail").textContent="Při odchylce od trasy provedu přepočet.";say("Navigace spuštěna. Nech aplikaci otevřenou.");$("nextStart").disabled=true;$("nextStop").disabled=false;$("nextHint").textContent="Navigace aktivní – sleduji tvoji polohu.";document.body.classList.add("guiding");updateGuidance(p);watch=navigator.geolocation.watchPosition(async x=>{let q=[x.coords.latitude,x.coords.longitude];if(!Number.isFinite(x.coords.accuracy)||x.coords.accuracy>65){say("Čekám na přesnější GPS signál.");return;}if(Number.isFinite(x.timestamp)&&Date.now()-x.timestamp>12000){say("GPS poloha je zastaralá, čekám na aktualizaci.");return;}setGpsSpeed(x.coords,q);const match=routeMatch(q),snapThreshold=Math.max(18,Math.min(35,x.coords.accuracy*1.2));const snapped=match.distance<snapThreshold?match.position:q;updateDragon(snapped,x.coords.accuracy);updateGuidance(q,match);const heading=Number.isFinite(x.coords.heading)&&x.coords.speed>1.5?x.coords.heading:map.getBearing();map.easeTo({center:[snapped[1],snapped[0]],bearing:heading,zoom:17,pitch:62,duration:650});const deviation=Math.max(65,x.coords.accuracy*2.5);offCount=match.distance>deviation?offCount+1:0;if(offCount>=3){offCount=0;await recalc(q)}else say("Navigace aktivní • GPS přesnost "+Math.round(x.coords.accuracy)+" m");},e=>say(e.code===1?"Přístup k poloze byl odebrán.":"GPS signál je nedostupný."),{enableHighAccuracy:true,maximumAge:3000,timeout:15000});map.easeTo({center:[p[1],p[0]],zoom:17,pitch:62,duration:700})}catch(e){say(e.message)}};
 $("stop").onclick=()=>{if(watch!==null)navigator.geolocation.clearWatch(watch);watch=null;$("start").disabled=false;$("stop").disabled=true;$("nav").style.display="none";if("speechSynthesis"in window)speechSynthesis.cancel();say("Navigace ukončena.");$("nextStart").disabled=false;$("nextStop").disabled=true;document.body.classList.remove("guiding");$("nextHint").textContent="Navigace ukončena. Můžeš naplánovat další trasu."};
 
 const emberBox=document.getElementById("proofEmbers");if(emberBox){for(let i=0;i<45;i++){const p=document.createElement("i");p.style.setProperty("--x",(24+(i*37%57))+"%");p.style.setProperty("--y",(20+(i*29%58))+"%");p.style.setProperty("--size",(1+i%4)+"px");p.style.setProperty("--duration",(1.2+i%6*.3)+"s");p.style.setProperty("--delay",(i%17*.17)+"s");p.style.setProperty("--dx",((i*43%170)-85)+"px");p.style.setProperty("--dy",(-35-i*19%190)+"px");emberBox.append(p)}}
