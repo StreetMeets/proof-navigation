@@ -685,41 +685,48 @@ function proofExplicitLimit(tags){
 }
 async function proofUpdateSpeedLimit(point,accuracy){
  const el=$("proofSpeedLimit");
- if(!Array.isArray(point)||!Number.isFinite(accuracy)||accuracy>35){el.textContent="—";return}
- const now=Date.now();if(proofLimitBusy||now-proofLimitLastAt<30000)return;
- if(proofLimitLastPoint&&haversine(point,proofLimitLastPoint)<100&&now-proofLimitLastAt<90000)return;
+ if(!Array.isArray(point)||!Number.isFinite(accuracy)||accuracy>55){el.textContent="—";return}
+ const now=Date.now();
+ if(proofLimitBusy||now-proofLimitLastAt<18000)return;
+ if(proofLimitLastPoint&&haversine(point,proofLimitLastPoint)<65&&now-proofLimitLastAt<60000)return;
  proofLimitLastAt=now;proofLimitLastPoint=point.slice();proofLimitBusy=true;
  const seq=++proofLimitSequence;
- const query='[out:json][timeout:9];way(around:45,'+point[0]+','+point[1]+')[highway];out geom;';
- const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),9000);
+ // Include all road classes; select a road only if the GPS match is unambiguous.
+ const query='[out:json][timeout:10];way(around:80,'+point[0]+','+point[1]+')[highway];out geom;';
  try{
-  let response;
-  for(const endpoint of ["https://overpass.kumi.systems/api/interpreter","https://overpass-api.de/api/interpreter"]){
-   try{response=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:"data="+encodeURIComponent(query),signal:controller.signal});if(response.ok)break}catch(e){if(controller.signal.aborted)throw e}
+  let data=null;
+  for(const endpoint of ["https://overpass.kumi.systems/api/interpreter","https://overpass.private.coffee/api/interpreter","https://overpass-api.de/api/interpreter"]){
+   const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),5000);
+   try{
+    const response=await fetch(endpoint,{method:"POST",headers:{"Content-Type":"application/x-www-form-urlencoded"},body:"data="+encodeURIComponent(query),signal:controller.signal});
+    if(response.ok){data=await response.json();break}
+   }catch(e){console.debug("Limit provider unavailable",endpoint,e)}
+   finally{clearTimeout(timer)}
   }
-  if(!response?.ok)throw Error("OSM service unavailable");
-  const data=await response.json(),candidates=[];
+  if(!data)throw Error("OSM speed-limit sources unavailable");
+  const candidates=[];
   for(const way of data.elements||[]){
    const tags=way.tags||{},geometry=way.geometry||[];
-   if(geometry.length<2||!["motorway","trunk","primary","secondary","tertiary","residential","unclassified","living_street","service","motorway_link","trunk_link","primary_link","secondary_link"].includes(tags.highway))continue;
+   if(geometry.length<2||!tags.highway||["footway","path","cycleway","pedestrian","steps","track","construction","proposed"].includes(tags.highway))continue;
    let distance=Infinity;
    for(let i=1;i<geometry.length;i++)distance=Math.min(distance,segdist(point,[geometry[i-1].lat,geometry[i-1].lon],[geometry[i].lat,geometry[i].lon]));
-   if(distance>Math.min(18,Math.max(9,accuracy)))continue;
+   if(distance>Math.min(24,Math.max(12,accuracy)))continue;
    const explicit=proofExplicitLimit(tags);
-   // The statutory motorway limit is a fallback, never infer 50/90 from the
-   // road class: built-up boundaries and local restrictions are not encoded here.
-   const limit=explicit??(tags.highway==="motorway"&&tags.maxspeed===undefined?130:null);
+   const limit=explicit??(tags.highway==="motorway"&&!tags.maxspeed?130:null);
    candidates.push({distance,limit,highway:tags.highway});
   }
   candidates.sort((a,b)=>a.distance-b.distance);
   if(seq!==proofLimitSequence)return;
   const best=candidates[0];
-  const ambiguous=best&&candidates.some(x=>x!==best&&x.distance<best.distance+9&&(x.limit!==best.limit||x.highway!==best.highway));
+  // Adjacent segments of the same road are OK; different nearby limits are not.
+  const ambiguous=best&&candidates.some(x=>x!==best&&x.distance<best.distance+7&&x.limit!==best.limit);
   const value=best&&!ambiguous?best.limit:null;
   el.textContent=value===null?"—":String(value);
-  el.title=value===null?"Limit není spolehlivě známý; sleduj značky":"Orientační údaj OSM / obecný limit dálnice; značky mají přednost";
- }catch(e){if(seq===proofLimitSequence){el.textContent="—";el.title="Limit nyní není dostupný"}console.warn("Speed limit lookup",e)}
- finally{clearTimeout(timer);proofLimitBusy=false}
+  el.title=value===null?"Limit se nepodařilo spolehlivě zjistit. Řiď se značkami.":"Orientační limit z OSM / základní limit dálnice. Značky mají přednost.";
+ }catch(e){
+  if(seq===proofLimitSequence){el.textContent="—";el.title="Mapová data limitu nejsou dostupná"}
+  console.warn("PROOF speed-limit lookup",e);
+ }finally{proofLimitBusy=false}
 }
 
 $("proofSpeedLimit").textContent="—";
