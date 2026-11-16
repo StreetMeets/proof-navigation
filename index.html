@@ -424,7 +424,7 @@ function proofInsideCz(lat,lon){return lat>=48.55&&lat<=51.06&&lon>=12.09&&lon<=
 async function nearbyCategory(category,brand=""){
  const config=proofNearbyCategories[category];if(!config)return;
  const request=++proofNearbyRequest;
- document.body.classList.add("search-open");psInput.value=brand;searchInput.value=brand;renderPlaces([],"Zjišťuji GPS polohu a hledám nejbližší: "+config.label+"…");
+ document.body.classList.add("search-open");if(brand){psInput.value=brand;searchInput.value=brand;}renderPlaces([],"Zjišťuji GPS polohu a hledám nejbližší: "+config.label+"…");
  let center;
  try{center=await gps()}catch(e){if(request===proofNearbyRequest)renderPlaces([],"Pro hledání nejbližších míst povol GPS polohu v prohlížeči. "+e.message);return}
  if(request!==proofNearbyRequest)return;
@@ -641,7 +641,7 @@ function proofDedupePlaces(places,q){
  .sort((a,b)=>proofAddressScore(b,q,focus)-proofAddressScore(a,q,focus)).slice(0,15);
 }
 async function proofPhotonRequest(q,signal,focus){
- const params=new URLSearchParams({q,limit:"35",bbox:"12.09,48.55,18.87,51.06",lang:"cs"});
+ const params=new URLSearchParams({q,limit:"35",bbox:"12.09,48.55,18.87,51.06",lang:"default"});
  if(focus){params.set("lat",String(focus[0]));params.set("lon",String(focus[1]));params.set("zoom","12");params.set("location_bias_scale","0.6")}
  const r=await fetch("https://photon.komoot.io/api/?"+params,{signal,headers:{"Accept":"application/json"}});
  if(!r.ok)throw Error("Photon HTTP "+r.status);
@@ -678,6 +678,7 @@ async function searchExactAddress(q){
 const proofFuelBrands={omv:"OMV",shell:"Shell",orlen:"Orlen",benzina:"Orlen",mol:"MOL"};
 function proofFuelBrand(q){return proofFuelBrands[q.trim().toLocaleLowerCase("cs")]||null}
 searchInput.addEventListener("input",()=>{
+ proofNearbyRequest++; // Invalidate in-flight nearby requests when user edits address.
  resetSelected();clearTimeout(lookupTimer);if(lookupController)lookupController.abort();
  const q=searchInput.value.trim(),seq=++lookupSerial;
  const fuelBrand=proofFuelBrand(q);
