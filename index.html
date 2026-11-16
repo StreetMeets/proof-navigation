@@ -427,6 +427,12 @@ function routeMatch(point){
  }
  return best;
 }
+function proofFormatTravelTime(seconds){
+ const minutes=Math.max(0,Math.ceil(seconds/60));
+ if(minutes<60)return minutes+" min";
+ const hours=Math.floor(minutes/60),mins=minutes%60;
+ return String(hours).padStart(2,"0")+":"+String(mins).padStart(2,"0")+" Hod";
+}
 function updateGuidance(point,matched){
  if(!routeSteps.length)return;
  const match=matched||routeMatch(point),progress=match.progress;
@@ -443,7 +449,7 @@ function updateGuidance(point,matched){
  if(following){const ni=maneuverInfo(following);$("nextThenArrow").textContent=ni.arrow;$("nextThenStreet").textContent=ni.text}else{$("nextThenArrow").textContent="◎";$("nextThenStreet").textContent="Cíl"}
  const remaining=Math.max(0,routeDistance-progress*Math.max(1,routeDistance)/(routeCum[routeCum.length-1]||routeDistance));
  $("nextKm").textContent=(remaining/1000).toFixed(1)+" km";
- $("nextMins").textContent=Math.max(0,Math.ceil(routeDuration*remaining/Math.max(1,routeDistance)/60))+" min";
+ $("nextMins").textContent=proofFormatTravelTime(routeDuration*remaining/Math.max(1,routeDistance));
  $("proofTripKm").textContent=$("nextKm").textContent;
  $("proofTripTime").textContent=$("nextMins").textContent;
  const arrivalDate=new Date(Date.now()+Math.max(0,routeDuration*remaining/Math.max(1,routeDistance))*1000);
