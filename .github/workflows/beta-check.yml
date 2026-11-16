@@ -1,0 +1,19 @@
+name: PROOF NEXT Beta checks
+on:
+  push:
+    branches: [beta/gps-camera-reroute-stability]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Verify navigation JavaScript and beta invariants
+        run: node tests/beta-check.cjs
