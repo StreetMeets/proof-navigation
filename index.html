@@ -583,7 +583,7 @@ function czRank(place,q){
 function proofAddressQueries(q){
  const clean=q.trim().replace(/\s+/g," "),noZip=clean.replace(/\b\d{3}\s?\d{2}\b/g,"").replace(/\s*,\s*,/g,",").replace(/,\s*$/,"").trim();
  const chunks=noZip.split(",").map(x=>x.trim()).filter(Boolean),list=[clean,noZip];
- const words=noZip.split(/\\s+/).filter(Boolean);
+ const words=noZip.split(/\s+/).filter(Boolean);
  if(words.length===2&&!/[0-9]/.test(noZip)){list.push(words[1]+" "+words[0]);list.push(words[1]);list.push(words[0])}
  if(chunks.length>1)list.push(chunks.slice(0,2).join(" "));
  const match=noZip.match(/^(.+?)\s+(\d+[a-zA-Z]?)\s*,\s*(.+)$/);
@@ -596,35 +596,64 @@ function proofPhotonPlace(f){
  const detail=[street&&p.name!==street?street:null,city,p.postcode,p.state,p.country].filter(Boolean).filter((v,i,a)=>a.indexOf(v)===i).join(", ");
  return {title,detail,display_name:[title,detail].filter(Boolean).join(", "),lat:f.geometry.coordinates[1],lon:f.geometry.coordinates[0],countryCode:p.countrycode||"",street:p.street||"",house:p.housenumber||""};
 }
+const proofAddressCache=new Map();
+function proofSearchFocus(){
+ const p=lastGpsPoint;
+ if(Array.isArray(p)&&Number.isFinite(p[0])&&Number.isFinite(p[1])&&proofInsideCz(p[0],p[1]))return p;
+ try{const center=map.getCenter();if(proofInsideCz(center.lat,center.lng)&&map.getZoom()>8)return [center.lat,center.lng]}catch(e){}
+ return null;
+}
+function proofAddressScore(p,q,focus){
+ const query=czNormalize(q),parts=query.split(/[\\s,]+/).filter(Boolean),title=czNormalize(p.title),hay=czNormalize(p.display_name);
+ let score=czRank(p,q);
+ if(title===query)score+=80;
+ if(title.startsWith(query))score+=35;
+ if(parts.every(w=>hay.includes(w)))score+=45;
+ if(p.house&&/\\d/.test(query))score+=20;
+ if(focus){const km=haversine(focus,[p.lat,p.lon])/1000;score+=Math.max(0,45-Math.log2(1+km)*8)}
+ return score;
+}
 function proofDedupePlaces(places,q){
- const seen=new Set();
- return places.filter(p=>Number.isFinite(+p.lat)&&Number.isFinite(+p.lon)).filter(p=>String(p.countryCode).toUpperCase()==="CZ"||(!p.countryCode&&p.lat>=48.55&&p.lat<=51.06&&p.lon>=12.09&&p.lon<=18.87)).filter(p=>{const key=[Number(p.lat).toFixed(5),Number(p.lon).toFixed(5),czNormalize(p.title)].join(":");if(seen.has(key))return false;seen.add(key);return true}).sort((a,b)=>czRank(b,q)-czRank(a,q)).slice(0,12);
+ const seen=new Set(),focus=proofSearchFocus();
+ return places.filter(p=>Number.isFinite(+p.lat)&&Number.isFinite(+p.lon))
+ .filter(p=>String(p.countryCode).toUpperCase()==="CZ"||(!p.countryCode&&proofInsideCz(+p.lat,+p.lon)))
+ .filter(p=>{const key=[Number(p.lat).toFixed(5),Number(p.lon).toFixed(5),czNormalize(p.title)].join(":");if(seen.has(key))return false;seen.add(key);return true})
+ .sort((a,b)=>proofAddressScore(b,q,focus)-proofAddressScore(a,q,focus)).slice(0,15);
+}
+async function proofPhotonRequest(q,signal,focus){
+ const params=new URLSearchParams({q,limit:"35",bbox:"12.09,48.55,18.87,51.06",lang:"cs"});
+ if(focus){params.set("lat",String(focus[0]));params.set("lon",String(focus[1]));params.set("zoom","12");params.set("location_bias_scale","0.6")}
+ const r=await fetch("https://photon.komoot.io/api/?"+params,{signal,headers:{"Accept":"application/json"}});
+ if(!r.ok)throw Error("Photon HTTP "+r.status);
+ const data=await r.json();
+ return (data.features||[]).filter(f=>Array.isArray(f.geometry?.coordinates)).map(proofPhotonPlace);
 }
 async function searchProviders(q,signal){
+ const focus=proofSearchFocus(),cacheKey=czNormalize(q)+"|"+(focus?focus.map(n=>n.toFixed(2)).join(","):"cz");
+ const cached=proofAddressCache.get(cacheKey);
+ if(cached&&Date.now()-cached.at<300000)return cached.places;
  const queries=proofAddressQueries(q),results=[];
- // Photon is used for suggestions. Exact lookup is only on Enter (not every keystroke).
- for(const query of queries.slice(0,4)){
+ for(const query of queries.slice(0,2)){
   if(signal?.aborted)throw new DOMException("Aborted","AbortError");
-  try{
-   const url="https://photon.komoot.io/api/?limit=30&bbox=12.09,48.55,18.87,51.06&q="+encodeURIComponent(query);
-   const r=await fetch(url,{signal,headers:{"Accept":"application/json"}});
-   if(!r.ok)throw Error("Photon HTTP "+r.status);
-   const data=await r.json();results.push(...(data.features||[]).filter(f=>Array.isArray(f.geometry?.coordinates)).map(proofPhotonPlace));
-   if(proofDedupePlaces(results,q).filter(p=>czRank(p,q)>=65).length>=6)break;
-  }catch(err){if(err.name==="AbortError")throw err;console.warn("Photon variant failed",err)}
+  try{results.push(...await proofPhotonRequest(query,signal,focus))}
+  catch(err){if(err.name==="AbortError")throw err;console.warn("Photon address search",err)}
+  if(proofDedupePlaces(results,q).filter(p=>proofAddressScore(p,q,focus)>100).length>=5)break;
  }
- const ranked=proofDedupePlaces(results,q);
- // Do not present a similarly named town as if it were the requested company.
- const tokens=czNormalize(q).split(/[\\s,]+/).filter(w=>w.length>=3&&!/^\\d+$/.test(w));
- return ranked.filter(p=>{const hay=czNormalize(p.display_name);return tokens.some(w=>hay.includes(w))}).slice(0,12);
+ const tokens=czNormalize(q).split(/[\\s,]+/).filter(w=>w.length>=2);
+ const places=proofDedupePlaces(results,q).filter(p=>tokens.some(w=>czNormalize(p.display_name).includes(w)));
+ proofAddressCache.set(cacheKey,{at:Date.now(),places});
+ if(proofAddressCache.size>80)proofAddressCache.delete(proofAddressCache.keys().next().value);
+ return places;
 }
 async function searchExactAddress(q){
- // Nominatim public endpoint: one explicit user-triggered request, never autocomplete.
- const url="https://nominatim.openstreetmap.org/search?format=jsonv2&addressdetails=1&countrycodes=cz&limit=8&q="+encodeURIComponent(q);
- const r=await fetch(url,{headers:{"Accept":"application/json","Accept-Language":"cs"}});
- if(!r.ok)throw Error("Nominatim HTTP "+r.status);
- const rows=await r.json();
- return proofDedupePlaces(rows.map(x=>({title:x.name||x.display_name.split(",")[0],detail:x.display_name,display_name:x.display_name,lat:+x.lat,lon:+x.lon,countryCode:"CZ",street:x.address?.road||"",house:x.address?.house_number||""})),q);
+ // Photon supports user-triggered exact searches too; avoids relying on public Nominatim.
+ const focus=proofSearchFocus(),queries=proofAddressQueries(q),results=[];
+ for(const query of queries.slice(0,3)){
+  try{results.push(...await proofPhotonRequest(query,undefined,focus))}
+  catch(e){console.warn("Exact address search",e)}
+  if(proofDedupePlaces(results,q).some(p=>proofAddressScore(p,q,focus)>115))break;
+ }
+ return proofDedupePlaces(results,q);
 }
 const proofFuelBrands={omv:"OMV",shell:"Shell",orlen:"Orlen",benzina:"Orlen",mol:"MOL"};
 function proofFuelBrand(q){return proofFuelBrands[q.trim().toLocaleLowerCase("cs")]||null}
