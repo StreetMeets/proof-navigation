@@ -576,30 +576,37 @@ function proofApplyMapTheme(){
  if(btn){btn.textContent=light?"☾":"☀";btn.title=light?"Tmavá mapa":"Světlá mapa";btn.setAttribute("aria-label",btn.title)}
  document.body.classList.toggle("proof-map-light",light);
 }
+/* PROOF NEXT Czech-first 3D game view: visual scope, never limits GPS or routing. */
+const proofCzechView={west:12.05,south:48.50,east:18.90,north:51.10};
+function proofCzechOverview(){
+ if(document.body.classList.contains("guiding"))return;
+ map.fitBounds([[proofCzechView.west,proofCzechView.south],[proofCzechView.east,proofCzechView.north]],{padding:30,pitch:proofGame3D?40:0,duration:800});
+}
 /* PROOF NEXT free game 3D: existing OpenFreeMap vector tiles, no API keys. */
-let proofGame3D=false;
-try{proofGame3D=localStorage.getItem("proofGame3D")==="1"}catch(e){}
+let proofGame3D=true;
+try{proofGame3D=localStorage.getItem("proofGame3D")!=="0"}catch(e){}
 function proofApplyGame3D(){
  try{
   const style=map.getStyle();if(!style)return;
   const vectorSource=Object.entries(style.sources||{}).find(([,s])=>s.type==="vector");
   if(proofGame3D&&vectorSource&&!map.getLayer("proof-game-buildings")){
    const labelLayer=(style.layers||[]).find(l=>l.type==="symbol"&&l.layout&&l.layout["text-field"]);
-   map.addLayer({id:"proof-game-buildings",type:"fill-extrusion",source:vectorSource[0], "source-layer":"building",minzoom:13,paint:{"fill-extrusion-color":"#69747a","fill-extrusion-height":["interpolate",["linear"],["zoom"],13,0,15,["coalesce",["get","render_height"],["get","height"],9]],"fill-extrusion-base":0,"fill-extrusion-opacity":0.72}},labelLayer?.id);
+   map.addLayer({id:"proof-game-buildings",type:"fill-extrusion",source:vectorSource[0], "source-layer":"building",minzoom:13,paint:{"fill-extrusion-color":"#78848a","fill-extrusion-height":["interpolate",["linear"],["zoom"],13,0,15,["coalesce",["get","render_height"],["get","height"],9]],"fill-extrusion-base":0,"fill-extrusion-opacity":0.8}},labelLayer?.id);
   }
   if(map.getLayer("proof-game-buildings"))map.setLayoutProperty("proof-game-buildings","visibility",proofGame3D?"visible":"none");
   map.setMaxPitch(proofGame3D?75:55);
-  if(!document.body.classList.contains("guiding"))map.easeTo({pitch:proofGame3D?58:0,duration:650});
+  if(!document.body.classList.contains("guiding"))map.easeTo({pitch:proofGame3D?50:0,duration:650});
  }catch(err){console.warn("3D buildings unavailable; navigation remains active",err)}
  const btn=document.getElementById("proofGame3DToggle");
- if(btn){btn.textContent=proofGame3D?"3D ZAP":"3D VYP";btn.setAttribute("aria-pressed",String(proofGame3D));}
+ if(btn){btn.textContent=proofGame3D?"◆ HERNÍ 3D":"◇ MAPA 2D";btn.setAttribute("aria-pressed",String(proofGame3D));}
 }
 function proofInitGame3D(){
  if(document.getElementById("proofGame3DToggle"))return;
  const btn=document.createElement("button");
  btn.id="proofGame3DToggle";btn.type="button";btn.title="Bezplatná herní 3D mapa";
- btn.style.cssText="position:absolute;z-index:550;top:58px;right:12px;padding:9px 11px;border-radius:9px;background:#151a20;color:#fff;border:1px solid #b42b2b;font-weight:800;font-size:12px;box-shadow:0 2px 12px #0008";
+ btn.style.cssText="position:absolute;z-index:550;top:58px;right:12px;padding:10px 14px;border-radius:12px;background:linear-gradient(135deg,#291015,#10151c);color:#fff;border:1px solid #ed3434;font-weight:900;font-size:12px;letter-spacing:.6px;box-shadow:0 3px 18px #0009,0 0 12px #d21e263b";
  btn.onclick=()=>{proofGame3D=!proofGame3D;try{localStorage.setItem("proofGame3D",proofGame3D?"1":"0")}catch(e){}proofApplyGame3D()};
+ btn.setAttribute("aria-label","Přepnout herní 3D mapu České republiky");
  const wrap=document.querySelector(".mapwrap")||document.getElementById("map")?.parentElement;
  if(wrap)wrap.appendChild(btn);
  proofApplyGame3D();
@@ -607,7 +614,7 @@ function proofInitGame3D(){
 map.on("style.load",()=>{proofApplyGame3D()});
 map.on("load",proofInitGame3D);
 map.on("style.load",()=>{try{proofApplyMapTheme()}catch(e){console.warn("Map styling",e)}});
-map.on("load",()=>{map.setPitch(0);proofApplyMapTheme()});
+map.on("load",()=>{proofApplyMapTheme();proofApplyGame3D()});
 
 function openHome(){document.body.classList.add("next-mode","home-mode");document.body.classList.remove("guiding");setTimeout(()=>map.resize(),100);setTimeout(()=>{$("homeSplash").classList.add("done")},1800)}
 function leaveHome(){document.body.classList.remove("home-mode");map.resize()}
