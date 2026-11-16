@@ -756,7 +756,7 @@ async function proofFuelStations(q,signal,focus){
  // Never assume the user is in Prague. With no GPS/map focus, use nationwide bounding box.
  const location=focus&&proofInsideCz(focus[0],focus[1])?focus:null;
  const filter=location?'(around:35000,'+location[0]+','+location[1]+')':'(48.55,12.09,51.06,18.87)';
- const query='[out:json][timeout:18];nwr["amenity"="fuel"]'+filter+';out center 1800;';
+ const query='[out:json][timeout:15];nwr["amenity"="fuel"]'+filter+';out center 600;';
  const endpoints=["https://overpass.kumi.systems/api/interpreter","https://overpass.nchc.org.tw/api/interpreter"];
  let data=null,lastError;
  for(const endpoint of endpoints){
@@ -771,13 +771,14 @@ async function proofFuelStations(q,signal,focus){
   }catch(e){lastError=e;if(signal?.aborted)throw new DOMException("Aborted","AbortError")}
   finally{clearTimeout(timer);signal?.removeEventListener("abort",abort)}
  }
- if(!data){console.warn("Fuel station source unavailable",lastError);return []}
+ if(!data){console.warn("Fuel station source unavailable",lastError);throw Error("Čerpací stanice momentálně nelze načíst.")}
  const matches=(data.elements||[]).map(el=>{
   const tags=el.tags||{},lat=el.lat??el.center?.lat,lon=el.lon??el.center?.lon;
   if(!Number.isFinite(lat)||!Number.isFinite(lon)||!proofInsideCz(lat,lon))return null;
   const name=tags.name||tags.brand||tags.operator||"Čerpací stanice";
   const searchable=czNormalize([name,tags.brand,tags.operator].join(" "));
-  if(!requested.generic&&!searchable.includes(requested.brand))return null;
+  const brandAlias=requested.brand==="orlen"&&searchable.includes("benzina");
+  if(!requested.generic&&!searchable.includes(requested.brand)&&!brandAlias)return null;
   const address=[tags["addr:street"],tags["addr:housenumber"]].filter(Boolean).join(" ");
   const city=tags["addr:city"]||tags["addr:place"]||"";
   const detail=[address,city,tags["addr:postcode"]].filter(Boolean).join(", ")||"Adresa není v OSM uvedena";
@@ -800,7 +801,7 @@ async function searchProviders(q,signal){
   catch(err){if(err.name==="AbortError")throw err;console.warn("Photon address search",err)}
   if(proofDedupePlaces(results,q).filter(p=>proofAddressScore(p,q,focus)>100).length>=5)break;
  }
- const tokens=czNormalize(q).split(/[\\s,]+/).filter(w=>w.length>=2);
+ const tokens=czNormalize(q).split(/[\s,]+/).filter(w=>w.length>=2);
  const places=proofDedupePlaces(results,q).filter(p=>p.fuelStation||tokens.some(w=>czNormalize(p.display_name).includes(w)));
  proofAddressCache.set(cacheKey,{at:Date.now(),places});
  if(proofAddressCache.size>80)proofAddressCache.delete(proofAddressCache.keys().next().value);
