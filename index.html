@@ -674,6 +674,28 @@ document.querySelectorAll("[data-route-choice]").forEach(btn=>btn.onclick=()=>{
 let proofNearbyRequest=0;
 function proofInsideCz(lat,lon){return lat>=48.55&&lat<=51.06&&lon>=12.09&&lon<=18.87}
 openHome();
+// On launch, center the map on a fresh, permitted GPS fix instead of the Europe overview.
+// Do not start route guidance or keep a second GPS watcher running.
+(function proofLocateOnLaunch(){
+ if(!navigator.geolocation||!window.isSecureContext)return;
+ let cancelled=false;
+ const cancel=()=>{cancelled=true};
+ map.on("dragstart",cancel);
+ map.on("zoomstart",e=>{if(e?.originalEvent)cancel()});
+ map.on("rotatestart",e=>{if(e?.originalEvent)cancel()});
+ navigator.geolocation.getCurrentPosition(position=>{
+  if(cancelled||document.body.classList.contains("guiding"))return;
+  const {latitude,longitude,accuracy}=position.coords;
+  if(!Number.isFinite(latitude)||!Number.isFinite(longitude)||!Number.isFinite(accuracy)||accuracy>150)return;
+  if(Number.isFinite(position.timestamp)&&Date.now()-position.timestamp>15000)return;
+  const center=()=>{
+   if(cancelled||document.body.classList.contains("guiding"))return;
+   map.easeTo({center:[longitude,latitude],zoom:16.5,pitch:proofGame3D?45:0,duration:850,essential:true});
+  };
+  if(map.loaded())center();else map.once("load",center);
+ },()=>{/* Permission denied or GPS unavailable: retain usable manual map and search. */},
+ {enableHighAccuracy:true,timeout:12000,maximumAge:5000});
+})();
 const say=s=>{$("status").textContent=s};
 document.querySelectorAll(".theme").forEach(b=>b.onclick=()=>{document.querySelectorAll(".theme").forEach(x=>x.classList.remove("active"));b.classList.add("active");root.style.setProperty("--accent",colors[b.dataset.c]);if(line)line.setStyle({color:colors[b.dataset.c]})});
 
