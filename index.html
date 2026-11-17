@@ -621,6 +621,19 @@ function proofCzechOverview(){
  if(document.body.classList.contains("guiding"))return;
  map.fitBounds([[proofCzechView.west,proofCzechView.south],[proofCzechView.east,proofCzechView.north]],{padding:30,pitch:proofGame3D?40:0,duration:800});
 }
+/* PROOF NEXT Game HUD: visual-only polish; keeps all navigation controls usable. */
+(function proofGameHudStyle(){
+ const style=document.createElement("style");
+ style.id="proof-game-hud-style";
+ style.textContent=`
+ body.next-mode .mapwrap:after{content:"";pointer-events:none;position:absolute;inset:0;z-index:2;background:linear-gradient(180deg,rgba(6,9,15,.27),transparent 26%,transparent 76%,rgba(7,8,13,.30));}
+ body.next-mode #proofGame3DToggle{backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);text-shadow:0 1px 2px #000;}
+ body.next-mode .mapbadge{border:1px solid rgba(255,66,66,.4);box-shadow:0 6px 24px rgba(0,0,0,.3);backdrop-filter:blur(10px);}
+ body.next-mode .maplibregl-ctrl-group{box-shadow:0 4px 16px rgba(0,0,0,.4)!important;border-radius:12px!important;overflow:hidden;}
+ @media(prefers-reduced-motion:reduce){body.next-mode #proofGame3DToggle{transition:none!important}}
+ `;
+ document.head.appendChild(style);
+})();
 /* PROOF NEXT free game 3D: existing OpenFreeMap vector tiles, no API keys. */
 let proofGame3D=true;
 try{proofGame3D=localStorage.getItem("proofGame3D")!=="0"}catch(e){}
