@@ -613,6 +613,7 @@ function proofApplyMapTheme(){
   }
  }
  if(map.getLayer("proof-satellite-layer"))map.setLayoutProperty("proof-satellite-layer","visibility","none");
+ if(map.getLayer("proof-game-buildings"))map.setPaintProperty("proof-game-buildings","fill-extrusion-color",light?"#b5b7b8":"#56636c");
  if(map.getLayer("proof-3d-buildings")){
   map.setPaintProperty("proof-3d-buildings","fill-extrusion-color",light?"#b6b8bb":"#566169");
   map.setPaintProperty("proof-3d-buildings","fill-extrusion-opacity",light?.52:.62);
