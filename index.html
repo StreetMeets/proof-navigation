@@ -570,15 +570,21 @@ function proofRacingMapStyle(){
 }
 /* Hybrid satellite: EOX Sentinel-2 2016 (CC BY 4.0) + OpenFreeMap street labels.
    The imagery is 10m resolution, not building-level aerial photography. */
-let proofMapTheme="dark";
-try{proofMapTheme=localStorage.getItem("proofMapTheme")==="light"?"light":"dark"}catch(e){}
+/* GTA San Andreas-inspired styling on existing OpenFreeMap vector tiles. */
+let proofThemeMode="auto",proofMapTheme="light";
+try{const stored=localStorage.getItem("proofThemeMode");if(["auto","light","dark"].includes(stored))proofThemeMode=stored;else if(localStorage.getItem("proofMapTheme")==="dark")proofThemeMode="dark"}catch(e){}
+function proofResolveTheme(){const hour=new Date().getHours();return proofThemeMode==="auto"?(hour>=7&&hour<19?"light":"dark"):proofThemeMode}
+function proofRefreshTheme(){const next=proofResolveTheme();if(next!==proofMapTheme){proofMapTheme=next;if(map.isStyleLoaded())proofApplyMapTheme()}}
+proofMapTheme=proofResolveTheme();
+setInterval(proofRefreshTheme,60000);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)proofRefreshTheme()});
 /* Crisp, road-first vector map. Satellite raster disabled: its 10m imagery was blurry at street zoom. */
 function proofApplyMapTheme(){
  const light=proofMapTheme==="light";
  const palette=light?{
- bg:"#edf1f3",land:"#edf1f3",park:"#cfe4d6",water:"#b6dce9",building:"#d5dce1",road:"#ffffff",major:"#fff6e6",motorway:"#f8d7a6",edge:"#b4c0ca",label:"#263441",halo:"#ffffff"
+ bg:"#f0f0ee",land:"#eeeeec",park:"#70ad61",water:"#8fc6dc",building:"#c8c9c9",road:"#55575b",major:"#36383d",motorway:"#c8a65a",edge:"#a5a7a7",label:"#22262a",halo:"#f4f4f1"
  }:{
- bg:"#111a20",land:"#1b252b",park:"#263e36",water:"#203f54",building:"#33414a",road:"#56636b",major:"#8b9496",motorway:"#c6a47d",edge:"#43515a",label:"#f1eee5",halo:"#18232a"
+ bg:"#0b1217",land:"#10191e",park:"#244b32",water:"#16384a",building:"#4c5960",road:"#52565d",major:"#777474",motorway:"#c7a15a",edge:"#38444b",label:"#f1eee5",halo:"#10191e"
  };
  const layers=map.getStyle()?.layers||[];
  for(const layer of layers){
@@ -607,12 +613,13 @@ function proofApplyMapTheme(){
   }
  }
  if(map.getLayer("proof-satellite-layer"))map.setLayoutProperty("proof-satellite-layer","visibility","none");
+ if(map.getLayer("proof-game-buildings"))map.setPaintProperty("proof-game-buildings","fill-extrusion-color",light?"#b5b7b8":"#56636c");
  if(map.getLayer("proof-3d-buildings")){
-  map.setPaintProperty("proof-3d-buildings","fill-extrusion-color",light?"#c2ccd3":"#46535a");
-  map.setPaintProperty("proof-3d-buildings","fill-extrusion-opacity",light?.36:.48);
+  map.setPaintProperty("proof-3d-buildings","fill-extrusion-color",light?"#b6b8bb":"#566169");
+  map.setPaintProperty("proof-3d-buildings","fill-extrusion-opacity",light?.52:.62);
  }
  const btn=document.getElementById("proofThemeToggle");
- if(btn){btn.textContent=light?"☾":"☀";btn.title=light?"Tmavá mapa":"Světlá mapa";btn.setAttribute("aria-label",btn.title)}
+ if(btn){btn.textContent=proofThemeMode==="auto"?"◐":light?"☾":"☀";btn.title=proofThemeMode==="auto"?"Automatický den/noc · klepnutím přepnout na den":light?"Denní GTA mapa · klepnutím přepnout na noc":"Noční GTA mapa · klepnutím zapnout automatiku";btn.setAttribute("aria-label",btn.title)}
  document.body.classList.toggle("proof-map-light",light);
 }
 /* PROOF NEXT Czech-first 3D game view: visual scope, never limits GPS or routing. */
@@ -633,6 +640,7 @@ function proofApplyGame3D(){
    map.addLayer({id:"proof-game-buildings",type:"fill-extrusion",source:vectorSource[0], "source-layer":"building",minzoom:13,paint:{"fill-extrusion-color":"#78848a","fill-extrusion-height":["interpolate",["linear"],["zoom"],13,0,15,["coalesce",["get","render_height"],["get","height"],9]],"fill-extrusion-base":0,"fill-extrusion-opacity":0.8}},labelLayer?.id);
   }
   if(map.getLayer("proof-game-buildings"))map.setLayoutProperty("proof-game-buildings","visibility",proofGame3D?"visible":"none");
+  if(map.getLayer("proof-game-buildings"))map.setPaintProperty("proof-game-buildings","fill-extrusion-color",proofMapTheme==="light"?"#b5b7b8":"#56636c");
   map.setMaxPitch(proofGame3D?75:55);
   if(!document.body.classList.contains("guiding"))map.easeTo({pitch:proofGame3D?50:0,duration:650});
  }catch(err){console.warn("3D buildings unavailable; navigation remains active",err)}
@@ -1399,7 +1407,7 @@ async function recalc(p){if(proofRerouteBusy||!dest||!document.body.classList.co
 $("find").onclick=async()=>{if(!$("dest").value.trim())return say("Nejdříve zadej cíl.");$("find").disabled=true;say("Vyhledávám a počítám trasu…");try{let a;if($("origin").value.trim())a=await geo($("origin").value.trim());else{try{a=await gps()}catch(gpsError){const manual=prompt("GPS není dostupná (například v Messengeru). Zadej výchozí město nebo adresu, nebo otevři Proof přímo v Safari:",localStorage.getItem("proofLastStart")||"Praha");if(!manual||!manual.trim())throw Error("Bez GPS vyplň start ručně, nebo otevři Proof v Safari.");$("origin").value=manual.trim();localStorage.setItem("proofLastStart",manual.trim());a=await geo(manual.trim())}}dest=selectedDestination&&selectedDestination.text===$("dest").value.trim()?selectedDestination.point:await geo($("dest").value.trim());let r=await getRoute(a,dest);show(r,a,dest);$("start").disabled=false;say("Trasa připravena. Stiskni SPUSTIT NAVIGACI.")}catch(e){say(e.message)}finally{$("find").disabled=false}};
 function enterNextMode(p){document.body.classList.add("next-mode");document.body.classList.remove("home-mode");map.resize();map.easeTo({center:[p[1],p[0]],zoom:17,pitch:62,duration:1100});if(dragonMarker)dragonMarker.setLngLat([p[1],p[0]]);else{let e=document.createElement("div");e.innerHTML=dragonHtml;dragonMarker=new maplibregl.Marker({element:e.firstElementChild,anchor:"center"}).setLngLat([p[1],p[0]]).addTo(map)}updateStreet(p,true);$("nextHint").textContent="Aktuální poloha nalezena. Zadej cíl a vyrazíme.";setTimeout(()=>map.resize(),250)}
 $("locate").onclick=async()=>{try{let p=await gps();enterNextMode(p);say("Proof Next: poloha nalezena.")}catch(e){say(e.message)}};
-$("proofThemeToggle").onclick=()=>{proofMapTheme=proofMapTheme==="dark"?"light":"dark";try{localStorage.setItem("proofMapTheme",proofMapTheme)}catch(e){}proofApplyMapTheme()};
+$("proofThemeToggle").onclick=()=>{proofThemeMode=proofThemeMode==="auto"?"light":proofThemeMode==="light"?"dark":"auto";try{localStorage.setItem("proofThemeMode",proofThemeMode)}catch(e){}proofMapTheme=proofResolveTheme();proofApplyMapTheme()};
 $("nextCenter").onclick=async()=>{try{let p=await gps();map.easeTo({center:[p[1],p[0]],zoom:16.5,pitch:35,duration:550})}catch(e){$("nextHint").textContent=e.message}};
 $("exitNext").onclick=()=>{document.body.classList.remove("guiding");openHome();};
 document.getElementById("proofRouteSelect").addEventListener("change",e=>{const radio=document.querySelector('input[name="proofRouteMode"][value="'+e.target.value+'"]');if(radio){radio.checked=true;radio.dispatchEvent(new Event("change"))}});
